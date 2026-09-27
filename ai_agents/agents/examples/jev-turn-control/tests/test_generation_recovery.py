@@ -3,7 +3,7 @@
 import asyncio
 import importlib
 import types
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from ten_ai_base.struct import LLMResponseMessageDone, LLMResponseMessageDelta
@@ -130,6 +130,10 @@ def test_buffer_control_preserves_reason_and_fences_old_response():
     adapter, action, _calls = adapter_for([[]])
     rid = action["response_id"]
     adapter.handle_data(
+        "jev_control", {"action": "stop", "reason": "buffer_limit"}
+    )
+    assert adapter.engine.active == rid
+    adapter.handle_data(
         "jev_control",
         {"action": "stop", "reason": "buffer_limit", "response_id": "old"},
     )
@@ -157,3 +161,13 @@ def test_buffer_control_preserves_reason_and_fences_old_response():
         )
         == 1
     )
+
+
+def test_buffer_control_without_response_cannot_clear_idle_pending():
+    adapter, _action, _calls = adapter_for([[]])
+    adapter.engine.active = None
+    adapter.engine.stop = Mock()
+    adapter.handle_data(
+        "jev_control", {"action": "stop", "reason": "buffer_limit"}
+    )
+    adapter.engine.stop.assert_not_called()

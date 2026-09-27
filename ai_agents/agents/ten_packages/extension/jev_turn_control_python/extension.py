@@ -498,9 +498,9 @@ class JevTurnControlExtension(AsyncExtension):
                     if payload.get("reason") == "buffer_limit"
                     else "manual_stop"
                 )
-                if (
-                    rid is not None or reason == "buffer_limit"
-                ) and rid != self.engine.active:
+                if (reason == "buffer_limit" and not rid) or (
+                    rid is not None and rid != self.engine.active
+                ):
                     return
                 self.engine.now = now
                 self.engine.stop(reason)
