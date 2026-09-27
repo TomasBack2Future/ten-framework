@@ -132,7 +132,7 @@ def test_defaults_baseline_overrides_and_label_validation():
     config = Config.load()
     assert config["provider"]["name"] == "jev"
     assert config["start"]["threshold"] == 0.47
-    assert config["start"]["score_mode"] == "top"
+    assert config["start"]["score_mode"] == "answer_plus_clarify"
     assert not config["compression"]["enabled"]
     assert not config["backchannel"]["enabled"]
     assert (
