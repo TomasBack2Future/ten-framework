@@ -68,8 +68,8 @@ def test_asr_revisions_and_repeated_final_do_not_renew_budget():
     assert not engine.active and len(engine.finished) == 1
 
 
-@pytest.mark.parametrize("label", ["explicit_wait", "ignore"])
-def test_consumed_hold_does_not_prefix_next_input(label):
+def test_consumed_ignore_does_not_prefix_next_input():
+    label = "ignore"
     engine = make()
     engine.input("Stop", True, 0, "s1")
     decide(engine, 120, label)
@@ -122,7 +122,7 @@ def test_playback_release_classifies_pending_before_expired_timer(label):
     engine.complete_decision(request, {"start": answer(label)}, 7901)
     engine.tick(7902)
     assert bool(engine.active) == (label == "answer")
-    assert not engine.pending
+    assert engine.pending == (label == "explicit_wait")
     if label == "answer":
         assert engine.history[-1]["text"] == utterance
 
@@ -279,7 +279,7 @@ def test_backchannel_stop_discards_joint_start_until_floor_release(label, ack):
     engine.complete_decision(request, {"start": answer(label)}, 6400)
     engine.tick(6401)
     assert bool(engine.active) == (label == "answer")
-    assert not engine.pending
+    assert engine.pending == (label == "explicit_wait")
 
 
 @pytest.mark.parametrize("label", ["answer", "ignore", "explicit_wait"])
@@ -296,5 +296,5 @@ def test_successful_start_recovers_hold_after_stop_provider_error(label):
     decide(engine, 6010, label)
     engine.tick(6100)
     assert bool(engine.active) == (label == "answer")
-    assert not engine.pending
+    assert engine.pending == (label == "explicit_wait")
     assert not engine.failed

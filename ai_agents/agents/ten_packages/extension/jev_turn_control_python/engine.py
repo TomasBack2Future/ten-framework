@@ -26,6 +26,9 @@ class TurnEngine:
         self.final = False
         self.pending = False
         self.input_cycle = 0
+        self.wait_hold = False
+        self.wait_rechecks = 0
+        self.wait_recheck_ready = False
         self.first_input = 0
         self.stop_pending_since = None
         self.last_input = 0
@@ -121,6 +124,8 @@ class TurnEngine:
             ),
             "pending": self.pending,
             "input_cycle": self.input_cycle,
+            "wait_hold": self.wait_hold,
+            "wait_rechecks": self.wait_rechecks,
             "text": self.text,
             "response_epoch": self.epoch,
             "active_response_id": self.active,
@@ -175,6 +180,8 @@ class TurnEngine:
         if self.active and self.stop_pending_since is None:
             self.stop_pending_since = now
         self.pending = True
+        self.wait_rechecks = 0
+        self.wait_recheck_ready = False
         self.text, self.final = combined, final
         self.revision += 1
         self.last_input = now
@@ -194,6 +201,9 @@ class TurnEngine:
         """End one input cycle without erasing committed conversation memory."""
         self.pending = False
         self.stop_pending_since = None
+        self.wait_hold = False
+        self.wait_rechecks = 0
+        self.wait_recheck_ready = False
         if self.segment:
             self.consumed_segment = self.segment
             self.consumed_text = self.text[len(self.committed) :].strip()
@@ -234,14 +244,25 @@ class TurnEngine:
         self.timer = {
             "timer_id": self.timer_seq,
             "label": label,
-            "due_ms": min(
-                self.now + delay,
-                self.last_input + self.config["scheduling"]["max_wait_ms"],
+            "due_ms": (
+                self.now + delay
+                if label == "explicit_wait"
+                else min(
+                    self.now + delay,
+                    self.last_input + self.config["scheduling"]["max_wait_ms"],
+                )
             ),
             "input_revision": self.revision,
             "epoch": self.epoch,
         }
         self.emit("timer.scheduled", self.timer)
+
+    def retain_wait(self):
+        """Keep unresponded content; at most two silence checks per revision."""
+        self.wait_hold = True
+        self.cancel_timer("retained_wait")
+        if self.wait_rechecks < 2:
+            self.schedule("explicit_wait")
 
     def begin_decision(self, now):
         self.now = now
@@ -288,6 +309,10 @@ class TurnEngine:
         kinds = [k for k in candidates if self.config[k]["enabled"]]
         if not kinds:
             return None
+        recheck = self.wait_recheck_ready
+        self.wait_recheck_ready = False
+        if recheck:
+            self.wait_rechecks += 1
         self.request_seq += 1
         request = {
             "request_id": self.request_seq,
@@ -302,6 +327,7 @@ class TurnEngine:
                 "heard_context": deepcopy(self.history),
                 "older_context_summary": self.summary,
                 "silence_ms": now - self.last_input,
+                "wait_recheck": recheck,
             },
         }
         self.inflight = request
@@ -372,6 +398,8 @@ class TurnEngine:
         self.last_decided_speaking = request["state"]["assistant_speaking"]
         self.failed = bool(error)
         if error:
+            if self.wait_hold:
+                self.retain_wait()
             self.emit(
                 "error", {"code": "provider_unavailable", "recoverable": True}
             )
@@ -418,6 +446,24 @@ class TurnEngine:
             "score_mode"
         ] == "answer_plus_clarify" and label in ("answer", "clarify"):
             score = reply_score
+        if (
+            self.wait_hold
+            and not request["state"].get("wait_recheck")
+            and (
+                label == "continuation"
+                or (not self.final and label in ("answer", "clarify"))
+            )
+        ):
+            # A user who asked to finish keeps the floor during live partials.
+            # A stable final or a bounded silence recheck may release it, but
+            # neither alone grants permission without a semantic start result.
+            self.mark_applied("start", effective_label="explicit_wait")
+            self.retain_wait()
+            return
+        if self.wait_hold and label in ("answer", "clarify", "continuation"):
+            # A current semantic result released the hold. Keep the existing
+            # confidence threshold and bounded fallback for this input.
+            self.wait_hold = False
         if label in (
             "answer",
             "clarify",
@@ -432,11 +478,20 @@ class TurnEngine:
                 self.mark_applied(
                     "start", effective_label=label, effective_score=score
                 )
-                self.schedule(label)
+                if label == "explicit_wait" or (
+                    self.wait_hold and label == "ignore"
+                ):
+                    self.retain_wait()
+                else:
+                    self.wait_hold = False
+                    self.schedule(label)
+        if self.wait_hold and not self.timer:
+            self.retain_wait()
         bc = answers.get("backchannel", {})
         if (
             not self.active
             and not self.stopping
+            and not self.wait_hold
             and label == "continuation"
             and bc.get("label") == "backchannel"
             and bc.get("score", 0) >= self.config["backchannel"]["threshold"]
@@ -512,6 +567,14 @@ class TurnEngine:
             or not self.config["start"]["enabled"]
         ):
             return
+        if self.wait_hold:
+            if self.timer and now >= self.timer["due_ms"]:
+                self.emit("timer.fired", {**self.timer, "action": "recheck"})
+                self.timer = None
+                self.last_decided = -1
+                self.last_start_decided = -1
+                self.wait_recheck_ready = True
+            return
         if self.awaiting_start_decision():
             return
         if self.failed and self.config["provider"]["failure_policy"] == "hold":
@@ -538,7 +601,7 @@ class TurnEngine:
                 },
             )
         self.timer = None
-        if label in ("ignore", "explicit_wait"):
+        if label == "ignore":
             self.consume_input(label)
             return
         if guidance:

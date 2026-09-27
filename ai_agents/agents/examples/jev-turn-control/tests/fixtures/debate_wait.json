@@ -1,0 +1,620 @@
+{
+  "source_session": "529fb62ae2f0048cbae562268b220c4b",
+  "source_request": 196,
+  "source_revision": 326,
+  "state": {
+    "input_text": "flow in the world, and maybe one of the richest countries in the world as well. However, it developed its army to be very strong, okay, let me finish. I want to re instate that the United States is one of the most richest countries in the world . However, it uses most of — it uses a large portion of its GDP to develop its army. And its nuclear weapon as well. It is the only co untry in the world that has ever used nuclear weapon in the real world. And it initiated multiple wars in the last 10 to 20 year s, and that's why I call it the most aggressive country in the world.",
+    "asr_final": true,
+    "assistant_speaking": false,
+    "heard_context": [
+      {
+        "role": "user",
+        "text": "Alright , today's topic is if the United States is the most powerful and aggressive country in the world, I'm with this opinion, and you're against it. Are you ready for the debate?"
+      },
+      {
+        "role": "assistant",
+        "text": "Absolutely—let's get right into it. I’m ready to cut through the fluff and challenge every point you’ll throw my way. Fire away!",
+        "response_id": "529fb62ae2f0048cbae562268b220c4b-r1",
+        "precision": "browser_completed_estimate",
+        "confirmed": true,
+        "fully_played": true
+      },
+      {
+        "role": "user",
+        "text": "Alright, so I am with the opinion that the United States is the most powerful , as well as aggressive co untry in the world. It is powerful bec ause it's the number 1 unit economy in the world. It has the largest capital flow in the world, and maybe one of the richest countries in the world as well."
+      },
+      {
+        "role": "assistant",
+        "text": "Hold on—let’s stop the “US is the most powerful” spiel right where it starts. First, you’re conflating GDP with *real* power. The U.S. is the largest *nominal* economy, but that’s a vanity metric. When you look at ",
+        "response_id": "529fb62ae2f0048cbae562268b220c4b-r2",
+        "precision": "provider_alignment_browser_cursor",
+        "confirmed": true,
+        "fully_played": false
+      }
+    ],
+    "older_context_summary": "",
+    "silence_ms": 121
+  },
+  "initial_answers": {
+    "start": {
+      "label": "explicit_wait",
+      "score": 0.38,
+      "probabilities": {
+        "continuation": 0.2,
+        "clarify": 0.01,
+        "answer": 0.38,
+        "ignore": 0.03,
+        "explicit_wait": 0.38
+      }
+    },
+    "backchannel": {
+      "label": "silent",
+      "score": 0.71,
+      "probabilities": {
+        "silent": 0.71,
+        "backchannel": 0.29
+      }
+    }
+  },
+  "silence_results": [
+    {
+      "id": "recorded-final-silence-4210",
+      "provider": "jev",
+      "repeat": 0,
+      "status": 200,
+      "body": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "start": {
+            "type": "choice",
+            "choice": "answer",
+            "confidence": 0.32,
+            "probabilities": {
+              "clarify": 0.01,
+              "ignore": 0.03,
+              "answer": 0.45,
+              "explicit_wait": 0.29,
+              "continuation": 0.22
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 1542,
+          "output_tokens": 56
+        }
+      },
+      "parsed": {
+        "start": {
+          "label": "answer",
+          "score": 0.45,
+          "probabilities": {
+            "clarify": 0.01,
+            "ignore": 0.03,
+            "answer": 0.45,
+            "explicit_wait": 0.29,
+            "continuation": 0.22
+          }
+        }
+      },
+      "ms": 314.7601669188589
+    },
+    {
+      "id": "recorded-final-silence-4210",
+      "provider": "jev",
+      "repeat": 2,
+      "status": 200,
+      "body": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "start": {
+            "type": "choice",
+            "choice": "answer",
+            "confidence": 0.25,
+            "probabilities": {
+              "answer": 0.4,
+              "explicit_wait": 0.34,
+              "continuation": 0.22,
+              "clarify": 0.01,
+              "ignore": 0.03
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 1542,
+          "output_tokens": 56
+        }
+      },
+      "parsed": {
+        "start": {
+          "label": "answer",
+          "score": 0.4,
+          "probabilities": {
+            "answer": 0.4,
+            "explicit_wait": 0.34,
+            "continuation": 0.22,
+            "clarify": 0.01,
+            "ignore": 0.03
+          }
+        }
+      },
+      "ms": 307.8596249688417
+    },
+    {
+      "id": "recorded-final-silence-4210",
+      "provider": "sd",
+      "repeat": 0,
+      "status": 200,
+      "body": {
+        "model": "classify-1",
+        "answers": {
+          "start": {
+            "type": "choice",
+            "choice": "continuation",
+            "probabilities": {
+              "answer": 0.041088249776921805,
+              "clarify": 0.08698382546032918,
+              "continuation": 0.5005719974674615,
+              "explicit_wait": 0.3036128559122368,
+              "ignore": 0.06774307138305077
+            },
+            "confidence": 0.5005719974674615
+          }
+        },
+        "usage": {
+          "input_tokens": 1521,
+          "output_tokens": 1,
+          "cost": 0.045689999999999995
+        }
+      },
+      "parsed": {
+        "start": {
+          "label": "continuation",
+          "score": 0.5005719974674615,
+          "probabilities": {
+            "answer": 0.041088249776921805,
+            "clarify": 0.08698382546032918,
+            "continuation": 0.5005719974674615,
+            "explicit_wait": 0.3036128559122368,
+            "ignore": 0.06774307138305077
+          }
+        }
+      },
+      "ms": 429.73620793782175
+    },
+    {
+      "id": "recorded-final-silence-4210",
+      "provider": "sd",
+      "repeat": 1,
+      "status": 200,
+      "body": {
+        "model": "classify-1",
+        "answers": {
+          "start": {
+            "type": "choice",
+            "choice": "continuation",
+            "probabilities": {
+              "answer": 0.041088249776921805,
+              "clarify": 0.08698382546032918,
+              "continuation": 0.5005719974674615,
+              "explicit_wait": 0.3036128559122368,
+              "ignore": 0.06774307138305077
+            },
+            "confidence": 0.5005719974674615
+          }
+        },
+        "usage": {
+          "input_tokens": 1521,
+          "output_tokens": 1,
+          "cost": 0.045689999999999995
+        }
+      },
+      "parsed": {
+        "start": {
+          "label": "continuation",
+          "score": 0.5005719974674615,
+          "probabilities": {
+            "answer": 0.041088249776921805,
+            "clarify": 0.08698382546032918,
+            "continuation": 0.5005719974674615,
+            "explicit_wait": 0.3036128559122368,
+            "ignore": 0.06774307138305077
+          }
+        }
+      },
+      "ms": 437.81720800325274
+    },
+    {
+      "id": "recorded-final-silence-4210",
+      "provider": "sd",
+      "repeat": 2,
+      "status": 200,
+      "body": {
+        "model": "classify-1",
+        "answers": {
+          "start": {
+            "type": "choice",
+            "choice": "continuation",
+            "probabilities": {
+              "answer": 0.041088249776921805,
+              "clarify": 0.08698382546032918,
+              "continuation": 0.5005719974674615,
+              "explicit_wait": 0.3036128559122368,
+              "ignore": 0.06774307138305077
+            },
+            "confidence": 0.5005719974674615
+          }
+        },
+        "usage": {
+          "input_tokens": 1521,
+          "output_tokens": 1,
+          "cost": 0.045689999999999995
+        }
+      },
+      "parsed": {
+        "start": {
+          "label": "continuation",
+          "score": 0.5005719974674615,
+          "probabilities": {
+            "answer": 0.041088249776921805,
+            "clarify": 0.08698382546032918,
+            "continuation": 0.5005719974674615,
+            "explicit_wait": 0.3036128559122368,
+            "ignore": 0.06774307138305077
+          }
+        }
+      },
+      "ms": 461.9464579736814
+    },
+    {
+      "id": "recorded-final-silence-4210",
+      "provider": "jev",
+      "repeat": 1,
+      "status": 200,
+      "body": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "start": {
+            "type": "choice",
+            "choice": "answer",
+            "confidence": 0.34,
+            "probabilities": {
+              "clarify": 0.01,
+              "explicit_wait": 0.29,
+              "answer": 0.47,
+              "ignore": 0.03,
+              "continuation": 0.2
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 1542,
+          "output_tokens": 56
+        }
+      },
+      "parsed": {
+        "start": {
+          "label": "answer",
+          "score": 0.47,
+          "probabilities": {
+            "clarify": 0.01,
+            "explicit_wait": 0.29,
+            "answer": 0.47,
+            "ignore": 0.03,
+            "continuation": 0.2
+          }
+        }
+      },
+      "ms": 4479.876082972623
+    }
+  ],
+  "prefixes": [
+    {
+      "request_id": 178,
+      "revision": 290,
+      "epoch": 3,
+      "started_ms": 87705,
+      "kinds": [
+        "start",
+        "backchannel"
+      ],
+      "state": {
+        "input_text": "flow in the world, and maybe one of the richest countries in the world as well. However, it developed its army to be very strong, okay, let me finish. I want to re instate that the United States is one of the most richest countries in the world . However, it uses most of — it uses a large portion of its GDP to develop its army. And its nuclear weapon as well. It is the only co untry in the world that has ever used nuclear weapon in the real world. And it initiated",
+        "asr_final": false,
+        "assistant_speaking": false,
+        "heard_context": [
+          {
+            "role": "user",
+            "text": "Alright , today's topic is if the United States is the most powerful and aggressive country in the world, I'm with this opinion, and you're against it. Are you ready for the debate?"
+          },
+          {
+            "role": "assistant",
+            "text": "Absolutely—let's get right into it. I’m ready to cut through the fluff and challenge every point you’ll throw my way. Fire away!",
+            "response_id": "529fb62ae2f0048cbae562268b220c4b-r1",
+            "precision": "browser_completed_estimate",
+            "confirmed": true,
+            "fully_played": true
+          },
+          {
+            "role": "user",
+            "text": "Alright, so I am with the opinion that the United States is the most powerful , as well as aggressive co untry in the world. It is powerful bec ause it's the number 1 unit economy in the world. It has the largest capital flow in the world, and maybe one of the richest countries in the world as well."
+          },
+          {
+            "role": "assistant",
+            "text": "Hold on—let’s stop the “US is the most powerful” spiel right where it starts. First, you’re conflating GDP with *real* power. The U.S. is the largest *nominal* economy, but that’s a vanity metric. When you look at ",
+            "response_id": "529fb62ae2f0048cbae562268b220c4b-r2",
+            "precision": "provider_alignment_browser_cursor",
+            "confirmed": true,
+            "fully_played": false
+          }
+        ],
+        "older_context_summary": "",
+        "silence_ms": 138
+      },
+      "response_id": null
+    },
+    {
+      "request_id": 182,
+      "revision": 295,
+      "epoch": 3,
+      "started_ms": 89604,
+      "kinds": [
+        "start",
+        "backchannel"
+      ],
+      "state": {
+        "input_text": "flow in the world, and maybe one of the richest countries in the world as well. However, it developed its army to be very strong, okay, let me finish. I want to re instate that the United States is one of the most richest countries in the world . However, it uses most of — it uses a large portion of its GDP to develop its army. And its nuclear weapon as well. It is the only co untry in the world that has ever used nuclear weapon in the real world. And it initiated multiple wars in",
+        "asr_final": false,
+        "assistant_speaking": false,
+        "heard_context": [
+          {
+            "role": "user",
+            "text": "Alright , today's topic is if the United States is the most powerful and aggressive country in the world, I'm with this opinion, and you're against it. Are you ready for the debate?"
+          },
+          {
+            "role": "assistant",
+            "text": "Absolutely—let's get right into it. I’m ready to cut through the fluff and challenge every point you’ll throw my way. Fire away!",
+            "response_id": "529fb62ae2f0048cbae562268b220c4b-r1",
+            "precision": "browser_completed_estimate",
+            "confirmed": true,
+            "fully_played": true
+          },
+          {
+            "role": "user",
+            "text": "Alright, so I am with the opinion that the United States is the most powerful , as well as aggressive co untry in the world. It is powerful bec ause it's the number 1 unit economy in the world. It has the largest capital flow in the world, and maybe one of the richest countries in the world as well."
+          },
+          {
+            "role": "assistant",
+            "text": "Hold on—let’s stop the “US is the most powerful” spiel right where it starts. First, you’re conflating GDP with *real* power. The U.S. is the largest *nominal* economy, but that’s a vanity metric. When you look at ",
+            "response_id": "529fb62ae2f0048cbae562268b220c4b-r2",
+            "precision": "provider_alignment_browser_cursor",
+            "confirmed": true,
+            "fully_played": false
+          }
+        ],
+        "older_context_summary": "",
+        "silence_ms": 127
+      },
+      "response_id": null
+    },
+    {
+      "request_id": 186,
+      "revision": 300,
+      "epoch": 3,
+      "started_ms": 91424,
+      "kinds": [
+        "start",
+        "backchannel"
+      ],
+      "state": {
+        "input_text": "flow in the world, and maybe one of the richest countries in the world as well. However, it developed its army to be very strong, okay, let me finish. I want to re instate that the United States is one of the most richest countries in the world . However, it uses most of — it uses a large portion of its GDP to develop its army. And its nuclear weapon as well. It is the only co untry in the world that has ever used nuclear weapon in the real world. And it initiated multiple wars in the last 10 to",
+        "asr_final": false,
+        "assistant_speaking": false,
+        "heard_context": [
+          {
+            "role": "user",
+            "text": "Alright , today's topic is if the United States is the most powerful and aggressive country in the world, I'm with this opinion, and you're against it. Are you ready for the debate?"
+          },
+          {
+            "role": "assistant",
+            "text": "Absolutely—let's get right into it. I’m ready to cut through the fluff and challenge every point you’ll throw my way. Fire away!",
+            "response_id": "529fb62ae2f0048cbae562268b220c4b-r1",
+            "precision": "browser_completed_estimate",
+            "confirmed": true,
+            "fully_played": true
+          },
+          {
+            "role": "user",
+            "text": "Alright, so I am with the opinion that the United States is the most powerful , as well as aggressive co untry in the world. It is powerful bec ause it's the number 1 unit economy in the world. It has the largest capital flow in the world, and maybe one of the richest countries in the world as well."
+          },
+          {
+            "role": "assistant",
+            "text": "Hold on—let’s stop the “US is the most powerful” spiel right where it starts. First, you’re conflating GDP with *real* power. The U.S. is the largest *nominal* economy, but that’s a vanity metric. When you look at ",
+            "response_id": "529fb62ae2f0048cbae562268b220c4b-r2",
+            "precision": "provider_alignment_browser_cursor",
+            "confirmed": true,
+            "fully_played": false
+          }
+        ],
+        "older_context_summary": "",
+        "silence_ms": 136
+      },
+      "response_id": null
+    },
+    {
+      "request_id": 192,
+      "revision": 310,
+      "epoch": 3,
+      "started_ms": 93685,
+      "kinds": [
+        "start",
+        "backchannel"
+      ],
+      "state": {
+        "input_text": "flow in the world, and maybe one of the richest countries in the world as well. However, it developed its army to be very strong, okay, let me finish. I want to re instate that the United States is one of the most richest countries in the world . However, it uses most of — it uses a large portion of its GDP to develop its army. And its nuclear weapon as well. It is the only co untry in the world that has ever used nuclear weapon in the real world. And it initiated multiple wars in the last 10 to 20 years, and that's why I",
+        "asr_final": false,
+        "assistant_speaking": false,
+        "heard_context": [
+          {
+            "role": "user",
+            "text": "Alright , today's topic is if the United States is the most powerful and aggressive country in the world, I'm with this opinion, and you're against it. Are you ready for the debate?"
+          },
+          {
+            "role": "assistant",
+            "text": "Absolutely—let's get right into it. I’m ready to cut through the fluff and challenge every point you’ll throw my way. Fire away!",
+            "response_id": "529fb62ae2f0048cbae562268b220c4b-r1",
+            "precision": "browser_completed_estimate",
+            "confirmed": true,
+            "fully_played": true
+          },
+          {
+            "role": "user",
+            "text": "Alright, so I am with the opinion that the United States is the most powerful , as well as aggressive co untry in the world. It is powerful bec ause it's the number 1 unit economy in the world. It has the largest capital flow in the world, and maybe one of the richest countries in the world as well."
+          },
+          {
+            "role": "assistant",
+            "text": "Hold on—let’s stop the “US is the most powerful” spiel right where it starts. First, you’re conflating GDP with *real* power. The U.S. is the largest *nominal* economy, but that’s a vanity metric. When you look at ",
+            "response_id": "529fb62ae2f0048cbae562268b220c4b-r2",
+            "precision": "provider_alignment_browser_cursor",
+            "confirmed": true,
+            "fully_played": false
+          }
+        ],
+        "older_context_summary": "",
+        "silence_ms": 121
+      },
+      "response_id": null
+    },
+    {
+      "request_id": 194,
+      "revision": 315,
+      "epoch": 3,
+      "started_ms": 94535,
+      "kinds": [
+        "start",
+        "backchannel"
+      ],
+      "state": {
+        "input_text": "flow in the world, and maybe one of the richest countries in the world as well. However, it developed its army to be very strong, okay, let me finish. I want to re instate that the United States is one of the most richest countries in the world . However, it uses most of — it uses a large portion of its GDP to develop its army. And its nuclear weapon as well. It is the only co untry in the world that has ever used nuclear weapon in the real world. And it initiated multiple wars in the last 10 to 20 years, and that's why I call it the most",
+        "asr_final": false,
+        "assistant_speaking": false,
+        "heard_context": [
+          {
+            "role": "user",
+            "text": "Alright , today's topic is if the United States is the most powerful and aggressive country in the world, I'm with this opinion, and you're against it. Are you ready for the debate?"
+          },
+          {
+            "role": "assistant",
+            "text": "Absolutely—let's get right into it. I’m ready to cut through the fluff and challenge every point you’ll throw my way. Fire away!",
+            "response_id": "529fb62ae2f0048cbae562268b220c4b-r1",
+            "precision": "browser_completed_estimate",
+            "confirmed": true,
+            "fully_played": true
+          },
+          {
+            "role": "user",
+            "text": "Alright, so I am with the opinion that the United States is the most powerful , as well as aggressive co untry in the world. It is powerful bec ause it's the number 1 unit economy in the world. It has the largest capital flow in the world, and maybe one of the richest countries in the world as well."
+          },
+          {
+            "role": "assistant",
+            "text": "Hold on—let’s stop the “US is the most powerful” spiel right where it starts. First, you’re conflating GDP with *real* power. The U.S. is the largest *nominal* economy, but that’s a vanity metric. When you look at ",
+            "response_id": "529fb62ae2f0048cbae562268b220c4b-r2",
+            "precision": "provider_alignment_browser_cursor",
+            "confirmed": true,
+            "fully_played": false
+          }
+        ],
+        "older_context_summary": "",
+        "silence_ms": 124
+      },
+      "response_id": null
+    },
+    {
+      "request_id": 195,
+      "revision": 319,
+      "epoch": 3,
+      "started_ms": 95261,
+      "kinds": [
+        "start",
+        "backchannel"
+      ],
+      "state": {
+        "input_text": "flow in the world, and maybe one of the richest countries in the world as well. However, it developed its army to be very strong, okay, let me finish. I want to re instate that the United States is one of the most richest countries in the world . However, it uses most of — it uses a large portion of its GDP to develop its army. And its nuclear weapon as well. It is the only co untry in the world that has ever used nuclear weapon in the real world. And it initiated multiple wars in the last 10 to 20 years, and that's why I call it the most aggressive",
+        "asr_final": false,
+        "assistant_speaking": false,
+        "heard_context": [
+          {
+            "role": "user",
+            "text": "Alright , today's topic is if the United States is the most powerful and aggressive country in the world, I'm with this opinion, and you're against it. Are you ready for the debate?"
+          },
+          {
+            "role": "assistant",
+            "text": "Absolutely—let's get right into it. I’m ready to cut through the fluff and challenge every point you’ll throw my way. Fire away!",
+            "response_id": "529fb62ae2f0048cbae562268b220c4b-r1",
+            "precision": "browser_completed_estimate",
+            "confirmed": true,
+            "fully_played": true
+          },
+          {
+            "role": "user",
+            "text": "Alright, so I am with the opinion that the United States is the most powerful , as well as aggressive co untry in the world. It is powerful bec ause it's the number 1 unit economy in the world. It has the largest capital flow in the world, and maybe one of the richest countries in the world as well."
+          },
+          {
+            "role": "assistant",
+            "text": "Hold on—let’s stop the “US is the most powerful” spiel right where it starts. First, you’re conflating GDP with *real* power. The U.S. is the largest *nominal* economy, but that’s a vanity metric. When you look at ",
+            "response_id": "529fb62ae2f0048cbae562268b220c4b-r2",
+            "precision": "provider_alignment_browser_cursor",
+            "confirmed": true,
+            "fully_played": false
+          }
+        ],
+        "older_context_summary": "",
+        "silence_ms": 133
+      },
+      "response_id": null
+    }
+  ],
+  "final_request": {
+    "request_id": 196,
+    "revision": 326,
+    "epoch": 3,
+    "started_ms": 96212,
+    "kinds": [
+      "start",
+      "backchannel"
+    ],
+    "state": {
+      "input_text": "flow in the world, and maybe one of the richest countries in the world as well. However, it developed its army to be very strong, okay, let me finish. I want to re instate that the United States is one of the most richest countries in the world . However, it uses most of — it uses a large portion of its GDP to develop its army. And its nuclear weapon as well. It is the only co untry in the world that has ever used nuclear weapon in the real world. And it initiated multiple wars in the last 10 to 20 year s, and that's why I call it the most aggressive country in the world.",
+      "asr_final": true,
+      "assistant_speaking": false,
+      "heard_context": [
+        {
+          "role": "user",
+          "text": "Alright , today's topic is if the United States is the most powerful and aggressive country in the world, I'm with this opinion, and you're against it. Are you ready for the debate?"
+        },
+        {
+          "role": "assistant",
+          "text": "Absolutely—let's get right into it. I’m ready to cut through the fluff and challenge every point you’ll throw my way. Fire away!",
+          "response_id": "529fb62ae2f0048cbae562268b220c4b-r1",
+          "precision": "browser_completed_estimate",
+          "confirmed": true,
+          "fully_played": true
+        },
+        {
+          "role": "user",
+          "text": "Alright, so I am with the opinion that the United States is the most powerful , as well as aggressive co untry in the world. It is powerful bec ause it's the number 1 unit economy in the world. It has the largest capital flow in the world, and maybe one of the richest countries in the world as well."
+        },
+        {
+          "role": "assistant",
+          "text": "Hold on—let’s stop the “US is the most powerful” spiel right where it starts. First, you’re conflating GDP with *real* power. The U.S. is the largest *nominal* economy, but that’s a vanity metric. When you look at ",
+          "response_id": "529fb62ae2f0048cbae562268b220c4b-r2",
+          "precision": "provider_alignment_browser_cursor",
+          "confirmed": true,
+          "fully_played": false
+        }
+      ],
+      "older_context_summary": "",
+      "silence_ms": 121
+    },
+    "response_id": null
+  }
+}

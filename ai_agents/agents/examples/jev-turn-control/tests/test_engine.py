@@ -406,7 +406,8 @@ def test_silence_explicit_wait_does_not_produce_guidance():
     engine.complete_decision(request, {"start": answer("explicit_wait")}, 200)
     engine.tick(5000)
     engine.tick(10000)
-    assert not engine.active and not engine.pending
+    assert not engine.active and engine.pending
+    assert engine.text == "Wait, let me think"
 
 
 def test_whitespace_duplicate_does_not_revise_or_reset_timer():
@@ -552,7 +553,8 @@ def test_pause_restores_label_and_excludes_paused_time_from_deadline():
         elif label == "continuation":
             assert engine.responses[engine.active]["mode"] == "clarify"
         else:
-            assert not engine.active and not engine.pending
+            assert not engine.active
+            assert engine.pending == (label == "explicit_wait")
 
 
 def test_new_input_while_paused_does_not_restore_old_ignore():
