@@ -16,7 +16,25 @@ export class Player {
   }
   async unlock() {
     this.ctx ??= new this.Context();
-    await this.ctx.resume();
+    let deadline;
+    try {
+      await Promise.race([
+        this.ctx.resume(),
+        new Promise((_, reject) => {
+          deadline = setTimeout(
+            () =>
+              reject(
+                new Error(
+                  "Audio playback is blocked. Open this page in a browser with audio enabled, then reconnect.",
+                ),
+              ),
+            2500,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(deadline);
+    }
     this.timer ??= setInterval(() => this.progress(false), 150);
   }
   begin(id) {
@@ -37,6 +55,7 @@ export class Player {
       this.blocked.has(m.response_id)
     )
       return false;
+    clearTimeout(this.completionTimer);
     const rate = m.sample_rate || 16000;
     if (
       m.channels !== 1 ||
@@ -47,7 +66,15 @@ export class Player {
       return false;
     const bytes = Uint8Array.from(atob(message.audio), (c) => c.charCodeAt(0));
     if (bytes.length % 2 || bytes.length > 192000) return false;
-    if (this.next - this.ctx.currentTime > 8) {
+    if (this.next - this.ctx.currentTime > 30) {
+      this.report({
+        response_id: this.response,
+        played_ms: this.cursor(),
+        stopped: true,
+        completed: false,
+        accuracy: "estimated",
+        reason: "buffer_limit",
+      });
       this.stop();
       return false;
     }
@@ -78,18 +105,27 @@ export class Player {
     }
   }
   checkComplete() {
-    if (this.response && this.generationDone && !this.sources.size) {
-      this.report({
-        response_id: this.response,
-        played_ms: this.cursor(),
-        stopped: false,
-        completed: true,
-        accuracy: "estimated",
-      });
-      this.blocked.add(this.response);
-      this.response = null;
-      this.timeline = [];
-    }
+    clearTimeout(this.completionTimer);
+    if (!this.response || !this.generationDone || this.sources.size) return;
+    // TEN data/audio routes can arrive in adjacent websocket batches. Require a
+    // quiet drain before acknowledgement; late PCM resets this bounded grace.
+    const id = this.response;
+    this.completionTimer = setTimeout(
+      () => {
+        if (this.response !== id || this.sources.size) return;
+        this.report({
+          response_id: id,
+          played_ms: this.cursor(),
+          stopped: false,
+          completed: true,
+          accuracy: "estimated",
+        });
+        this.blocked.add(id);
+        this.response = null;
+        this.timeline = [];
+      },
+      this.timeline.length ? 150 : 500,
+    );
   }
   cursor() {
     if (!this.ctx) return 0;
@@ -121,6 +157,7 @@ export class Player {
         this.blocked.delete(this.blocked.values().next().value);
     }
     if (id !== this.response) return;
+    clearTimeout(this.completionTimer);
     for (const source of this.sources) {
       source.stop();
       source.disconnect();

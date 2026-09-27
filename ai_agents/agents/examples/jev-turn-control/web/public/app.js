@@ -2,6 +2,7 @@ import { EventStore } from "./state.js";
 import { Player, Recorder } from "./audio.js";
 const $ = (id) => document.getElementById(id);
 const store = new EventStore();
+const taskCards = new Map();
 let socket,
   config,
   session,
@@ -14,6 +15,10 @@ const send = (data) => {
 };
 const control = (data) => send({ type: "data", name: "jev_control", data });
 const player = new Player((data) => {
+  if (data.reason === "buffer_limit") {
+    control({ action: "stop" });
+    fail("Playback buffer limit reached; output stopped.");
+  }
   send({ type: "data", name: "jev_playback", data });
 });
 const recorder = new Recorder();
@@ -79,6 +84,21 @@ function apply(e) {
   renderEvent(e);
   $("revision").textContent = `Input revision ${e.input_revision}`;
   const p = e.payload || {};
+  if (e.type.startsWith("task.") && typeof p.task_id === "string") {
+    $("tasks-panel").hidden = false;
+    let card = taskCards.get(p.task_id);
+    if (!card) {
+      card = document.createElement("p");
+      taskCards.set(p.task_id, card);
+      $("tasks").append(card);
+    }
+    card.textContent = `${p.task_id} · ${p.status || e.type} · ${p.summary || ""} ${Array.isArray(p.artifacts) ? p.artifacts.map((a) => `${a.name} (${a.bytes} bytes)`).join(", ") : ""}`;
+    if (taskCards.size > 8) {
+      const id = taskCards.keys().next().value;
+      taskCards.get(id).remove();
+      taskCards.delete(id);
+    }
+  }
   if (e.type === "state.snapshot") {
     // Restore labels only: NEVER replay response.started or audio from a snapshot.
     player.stop();
@@ -187,6 +207,9 @@ $("connect").onclick = async () => {
     ])
       $(id).disabled = true;
     store.reset();
+    taskCards.clear();
+    $("tasks").replaceChildren();
+    $("tasks-panel").hidden = true;
     $("events").replaceChildren();
     $("connect").disabled = true;
     closing = false;
@@ -218,6 +241,7 @@ $("end").onclick = async () => {
   status("Session ended");
 };
 $("mic").onclick = async () => {
+  $("mic").disabled = true;
   try {
     if (recording) {
       await recorder.stop();
@@ -229,6 +253,8 @@ $("mic").onclick = async () => {
     $("mic").textContent = recording ? "Mute microphone" : "Microphone off";
   } catch (e) {
     fail(e);
+  } finally {
+    $("mic").disabled = !session || config.mode !== "live";
   }
 };
 $("stop").onclick = () => {
@@ -259,6 +285,7 @@ $("login").onsubmit = async (e) => {
     await api("/api/login", { code: $("access").value });
     $("access").value = "";
     $("login").hidden = true;
+    $("connect").disabled = false;
     $("error").textContent = "";
   } catch (err) {
     fail(err);
@@ -281,6 +308,8 @@ fetch("/api/config")
   .then((r) => r.json())
   .then((c) => {
     config = c;
+    $("login").hidden = c.authenticated;
+    $("connect").disabled = !c.authenticated;
     $("mode").textContent =
       c.mode === "live" ? "LIVE · TEN GRAPH" : "MOCK · SCRIPTED";
     $("version").textContent = c.revision.slice(0, 12);

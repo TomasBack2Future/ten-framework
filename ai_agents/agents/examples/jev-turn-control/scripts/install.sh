@@ -5,6 +5,12 @@ TMAN="${TMAN:-tman}"
 ARGS=(-y)
 if [[ -n "${TMAN_CONFIG:-}" ]]; then ARGS+=(-c "$TMAN_CONFIG"); fi
 (cd tenapp && timeout --kill-after=5s 300s "$TMAN" "${ARGS[@]}" install)
+# Local extension API imports resolve from their source paths.
+BASE=../../ten_packages/system/ten_ai_base
+if ! test -e "$BASE"; then
+    mkdir -p ../../ten_packages/system
+    ln -s ../../examples/jev-turn-control/tenapp/ten_packages/system/ten_ai_base "$BASE"
+fi
 if ! test -x .venv/bin/python; then
     uv venv --python python3 --system-site-packages .venv
 fi

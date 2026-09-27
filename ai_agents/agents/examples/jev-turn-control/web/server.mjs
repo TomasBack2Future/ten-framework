@@ -196,7 +196,8 @@ const server = http.createServer(async (req, res) => {
     );
     if (req.url === "/healthz")
       return json(res, 200, { ok: true, revision, mode });
-    if (req.url === "/api/config") return json(res, 200, { mode, revision });
+    if (req.url === "/api/config")
+      return json(res, 200, { mode, revision, authenticated: allowed(req) });
     if (req.method === "POST") {
       if (req.headers.origin && req.headers.origin !== origin)
         return json(res, 403, { error: "Origin rejected" });

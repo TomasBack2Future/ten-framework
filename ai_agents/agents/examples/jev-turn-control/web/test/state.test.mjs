@@ -70,3 +70,57 @@ test("cancel stops active and queued sources; late audio cannot restart old resp
   assert.equal(p.play(m), false);
   await p.destroy();
 });
+
+test("end notification arriving before the final PCM batch does not discard audio", async () => {
+  let source;
+  class Context {
+    currentTime = 0;
+    destination = {};
+    async resume() {}
+    async close() {}
+    createBuffer(c, n, r) {
+      return { duration: n / r, getChannelData: () => new Float32Array(n) };
+    }
+    createBufferSource() {
+      source = { connect() {}, disconnect() {}, start() {}, stop() {} };
+      return source;
+    }
+  }
+  const reports = [];
+  const p = new Player((x) => reports.push(x), Context);
+  await p.unlock();
+  p.begin("late");
+  p.audioComplete("late");
+  assert.ok(
+    p.play({
+      audio: btoa("\0".repeat(3200)),
+      metadata: {
+        response_id: "late",
+        sample_rate: 16000,
+        channels: 1,
+        bytes_per_sample: 2,
+      },
+    }),
+  );
+  assert.equal(
+    reports.some((x) => x.completed),
+    false,
+  );
+  p.ctx.currentTime = 0.2;
+  source.onended();
+  await new Promise((r) => setTimeout(r, 180));
+  assert.equal(reports.at(-1).completed, true);
+  await p.destroy();
+});
+
+test("blocked audio activation fails with a bounded, visible recovery message", async () => {
+  class BlockedContext {
+    resume() {
+      return new Promise(() => {});
+    }
+    async close() {}
+  }
+  const p = new Player(() => {}, BlockedContext);
+  await assert.rejects(p.unlock(), /Audio playback is blocked/);
+  await p.destroy();
+});

@@ -74,6 +74,8 @@ jobs:
     - name: Native graph smoke without network or credentials
       run: |
         docker run --rm --network none ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} node web/test/runtime-smoke.mjs
+        docker run --rm --network none ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} bash scripts/smoke.sh
+        docker run --rm --network none ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} .venv/bin/python -m unittest discover -s executor/tests -p test_adapter.py
     - uses: docker/login-action@v3
       if: github.event_name == 'push'
       with:

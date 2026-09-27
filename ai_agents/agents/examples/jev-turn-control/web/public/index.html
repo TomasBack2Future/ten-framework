@@ -29,7 +29,7 @@
         <div class="orb" id="orb"><span>J</span></div>
         <div id="subtitle" aria-live="polite">Connect to begin a session.</div>
         <div class="controls">
-          <button id="connect" class="primary">Connect</button
+          <button id="connect" class="primary" disabled>Connect</button
           ><button id="mic" disabled>Microphone off</button
           ><button id="stop" disabled>Stop playback</button
           ><button id="end" disabled>End call</button>
@@ -154,6 +154,14 @@
           </table>
         </div>
       </details>
+      <section class="panel" id="tasks-panel" hidden>
+        <h3>Background tasks</h3>
+        <p>
+          Execution is disabled in this demo. Stopping speech never cancels a
+          task.
+        </p>
+        <div id="tasks"></div>
+      </section>
       <p id="error" role="alert"></p>
       <footer>
         Built on the public TEN Framework <span id="version"></span>
