@@ -42,7 +42,7 @@ human voice conversation.
 
 Use openai==1.109.1, httpx==0.28.1 and websockets==15.0.1 for this public-source
 snapshot. Unpinned openai resolved to a newer package using httpx2 while the
-extension imports httpx. The Web workstream owns installation/image fixes.
+extension imports httpx. The installation fixes from Web commit ec438b7 are included verbatim in this branch.
 Local tman links may require a missing ten_ai_base schema-path fallback in
 agents/ten_packages/system; do not copy or change vendor business source.
 
@@ -53,7 +53,7 @@ audio, or commercial code are committed.
 
 ## Final local checks and integrated overseas evidence
 
-18 tests passed in 1.94s, including the real native WebSocket graph.
+19 tests passed in 1.94s, including the real native WebSocket graph.
 Black, Pylint 10/10, four tman schemas and Python compilation passed.
 The Web workstream reported a successful khipaa public HTTPS/WSS live synthetic
 loop on integrated commit 5a0dba4: Soniox partial/final, Jev probability results
