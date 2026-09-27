@@ -245,3 +245,47 @@ def test_config_invalid_values_and_text_redaction():
     engine = make()
     engine.input("private speech", False, 0)
     assert engine.events[-1]["payload"]["text"] == "[redacted]"
+
+
+def test_late_alignment_refines_only_heard_context():
+    engine = make(observation={"include_text": True})
+    rid = start(engine)
+    engine.output(rid, "Hello world never heard", 500)
+    engine.playback(rid, 400, 900, stopped=True)
+    assert engine.history[-1]["precision"] == "character_rate_estimate"
+    engine.align(
+        rid,
+        [{"text": "Hello ", "end_ms": 300}, {"text": "world ", "end_ms": 700}],
+    )
+    assert engine.history[-1]["text"] == "Hello "
+    assert (
+        engine.history[-1]["precision"] == "provider_alignment_browser_cursor"
+    )
+    assert engine.events[-1]["payload"]["alignment_updated"]
+
+
+def test_ignore_consumes_without_speaking_and_disabled_start_holds():
+    engine = make()
+    engine.input("um", False, 0)
+    request = engine.begin_decision(120)
+    engine.complete_decision(request, {"start": answer("ignore")}, 200)
+    engine.tick(2000)
+    assert not engine.pending and engine.active is None
+    engine = make(start={"enabled": False})
+    engine.input("hello?", True, 0)
+    engine.tick(10000)
+    assert engine.active is None
+
+
+def test_finished_context_is_bounded():
+    engine = make(playback={"context_responses": 2})
+    for index in range(5):
+        engine.now = index * 1000
+        engine.text = "hello"
+        engine.start("answer")
+        rid = engine.active
+        engine.output(rid, "hello", engine.now)
+        engine.playback(rid, 500, engine.now + 500, completed=True)
+    assert len(engine.finished) == 2
+    assert len(engine.history) == 2
+    assert not engine.responses

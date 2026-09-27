@@ -33,6 +33,7 @@ class TurnEngine:
         self.active = None
         self.stopping = None
         self.responses = {}
+        self.finished = {}
         self.history = deque(
             maxlen=self.config["playback"]["context_responses"]
         )
@@ -440,19 +441,53 @@ class TurnEngine:
         )
         return True
 
+    def heard(self, response):
+        words = response["alignment"]
+        if words:
+            return (
+                "".join(
+                    w["text"]
+                    for w in words
+                    if w["end_ms"] <= response["played_ms"]
+                ),
+                "provider_alignment_browser_cursor",
+            )
+        count = int(
+            response["played_ms"]
+            / 1000
+            * self.config["playback"]["chars_per_second"]
+        )
+        return response["text"][:count], "character_rate_estimate"
+
     def align(self, rid, words):
-        if rid in self.responses:
-            valid = [
-                w
-                for w in words
-                if isinstance(w.get("text"), str)
-                and isinstance(w.get("end_ms"), (int, float))
-                and w["end_ms"] >= 0
-            ]
-            self.responses[rid]["alignment"] = sorted(
-                self.responses[rid]["alignment"] + valid,
-                key=lambda w: w["end_ms"],
-            )[:5000]
+        response = self.responses.get(rid) or self.finished.get(rid)
+        if response is None:
+            return
+        valid = [
+            w
+            for w in words
+            if isinstance(w.get("text"), str)
+            and isinstance(w.get("end_ms"), (int, float))
+            and 0 <= w["end_ms"] <= 3600000
+        ]
+        response["alignment"] = sorted(
+            response["alignment"] + valid, key=lambda w: w["end_ms"]
+        )[:5000]
+        if rid in self.finished:
+            heard, precision = self.heard(response)
+            for item in self.history:
+                if item.get("response_id") == rid:
+                    item.update(text=heard, precision=precision)
+            self.emit(
+                "playback.progress",
+                {
+                    "played_ms": response["played_ms"],
+                    "heard_text": heard,
+                    "precision": precision,
+                    "alignment_updated": True,
+                },
+                rid,
+            )
 
     def playback(
         self,
@@ -470,20 +505,7 @@ class TurnEngine:
         response["played_ms"] = max(
             response["played_ms"], min(max(0, played_ms), 3600000)
         )
-        words = response["alignment"]
-        if words:
-            heard = "".join(
-                w["text"] for w in words if w["end_ms"] <= response["played_ms"]
-            )
-            precision = "provider_alignment_browser_cursor"
-        else:
-            count = int(
-                response["played_ms"]
-                / 1000
-                * self.config["playback"]["chars_per_second"]
-            )
-            heard = response["text"][:count]
-            precision = "character_rate_estimate"
+        heard, precision = self.heard(response)
         response["precision"] = precision
         self.emit(
             "playback.stopped" if stopped else "playback.progress",
@@ -510,6 +532,12 @@ class TurnEngine:
                 self.active = None
             if self.stopping == rid:
                 self.stopping = None
+            self.finished[rid] = response
+            while (
+                len(self.finished)
+                > self.config["playback"]["context_responses"]
+            ):
+                del self.finished[next(iter(self.finished))]
             del self.responses[rid]
 
     def pause(self, now):
