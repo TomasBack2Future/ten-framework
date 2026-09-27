@@ -111,3 +111,31 @@ def test_provider_applies_ready_result_before_timeout_wrapper_wakes_caller(
         assert engine.active == rid
 
     asyncio.run(run())
+
+
+def test_fast_stop_error_preserves_safety_deadline():
+    engine = make()
+    rid = start(engine)
+    engine.input("Stop!", True, 500, "barge")
+    request = engine.begin_decision(650)
+    engine.complete_decision(request, {}, 700, error=True)
+    engine.tick(1299)
+    assert engine.active == rid
+    engine.tick(1300)
+    assert engine.active is None and engine.stopping == rid
+
+
+def test_same_segment_final_retains_meaningful_symbols():
+    for partial, final in (
+        ("50", "50%"),
+        ("50", "50 %"),
+        ("3", "3#"),
+        ("James", "James'"),
+    ):
+        engine = make()
+        engine.input(partial, False, 0, "same")
+        engine.start("answer")
+        revision = engine.revision
+        engine.input(final, True, 500, "same")
+        assert engine.pending and engine.revision == revision + 1
+        assert engine.text == final

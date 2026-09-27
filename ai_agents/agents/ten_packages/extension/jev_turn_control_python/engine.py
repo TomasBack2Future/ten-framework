@@ -3,7 +3,6 @@
 from collections import deque
 from copy import deepcopy
 import math
-import unicodedata
 
 from .config import Config
 
@@ -144,7 +143,7 @@ class TurnEngine:
 
         def normalized(text):
             text = text.strip().casefold()
-            while text and unicodedata.category(text[-1]).startswith("P"):
+            while text and text[-1] in ".?!。？！…":
                 text = text[:-1].rstrip()
             return text
 
@@ -503,7 +502,6 @@ class TurnEngine:
             and self.stop_pending_since is not None
             and now
             >= self.stop_pending_since + self.config["stop"]["max_wait_ms"]
-            and self.last_decided != self.revision
         ):
             self.stop("stop_maximum_wait")
             self.schedule("continuation")
@@ -577,6 +575,7 @@ class TurnEngine:
             "mode": mode,
             "precision": "unknown",
             "generation_done": False,
+            "tts_submitted": False,
             "audio_done": False,
             "audio_end_received": False,
             "audio_failed": False,

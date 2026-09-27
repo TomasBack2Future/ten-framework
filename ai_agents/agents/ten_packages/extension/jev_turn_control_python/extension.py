@@ -304,10 +304,13 @@ class JevTurnControlExtension(AsyncExtension):
                         rid,
                     )
                     if (
-                        self.engine.responses[rid]["text"].strip()
+                        self.engine.responses[rid]["tts_submitted"]
                         or self.engine.responses[rid]["audio_ms"] > 0
                     ):
                         raise
+                    # Discard only text that has never been handed to TTS.
+                    self.engine.responses[rid]["text"] = ""
+                    self.engine.output(rid, "", self.now())
                     if attempt == 0:
                         self.engine.emit(
                             "generation.retry",
@@ -424,6 +427,8 @@ class JevTurnControlExtension(AsyncExtension):
 
     async def tts(self, rid, text, final):
         if rid == self.engine.active:
+            if text.strip():
+                self.engine.responses[rid]["tts_submitted"] = True
             self.record(
                 "tts.input", {"text": text, "text_input_end": final}, rid
             )
