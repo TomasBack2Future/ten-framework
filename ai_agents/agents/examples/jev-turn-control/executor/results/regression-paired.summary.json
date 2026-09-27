@@ -1,0 +1,91 @@
+{
+  "jev": {
+    "n": 80,
+    "errors": 0,
+    "confusion_matrix": {
+      "conversation": {
+        "conversation": 23,
+        "execute": 2,
+        "clarify": 1,
+        "task_control": 0,
+        "error": 0
+      },
+      "execute": {
+        "conversation": 0,
+        "execute": 32,
+        "clarify": 1,
+        "task_control": 0,
+        "error": 0
+      },
+      "clarify": {
+        "conversation": 0,
+        "execute": 1,
+        "clarify": 8,
+        "task_control": 0,
+        "error": 0
+      },
+      "task_control": {
+        "conversation": 0,
+        "execute": 1,
+        "clarify": 0,
+        "task_control": 11,
+        "error": 0
+      }
+    },
+    "accuracy": 0.925,
+    "execute_precision": 0.8888888888888888,
+    "execute_recall": 0.9696969696969697,
+    "false_execution_rate": 0.016666666666666666,
+    "support_accuracy": 0.925,
+    "p50_latency_ms": 766.9402920291759,
+    "max_latency_ms": 2902.10745902732,
+    "cost_usd": null
+  },
+  "scaledown": {
+    "n": 80,
+    "errors": 0,
+    "confusion_matrix": {
+      "conversation": {
+        "conversation": 20,
+        "execute": 3,
+        "clarify": 0,
+        "task_control": 3,
+        "error": 0
+      },
+      "execute": {
+        "conversation": 0,
+        "execute": 31,
+        "clarify": 2,
+        "task_control": 0,
+        "error": 0
+      },
+      "clarify": {
+        "conversation": 0,
+        "execute": 0,
+        "clarify": 9,
+        "task_control": 0,
+        "error": 0
+      },
+      "task_control": {
+        "conversation": 0,
+        "execute": 0,
+        "clarify": 1,
+        "task_control": 11,
+        "error": 0
+      }
+    },
+    "accuracy": 0.8875,
+    "execute_precision": 0.9117647058823529,
+    "execute_recall": 0.9393939393939394,
+    "false_execution_rate": 0.0,
+    "support_accuracy": 0.9125,
+    "p50_latency_ms": 1745.9713955176994,
+    "max_latency_ms": 3022.896167007275,
+    "cost_usd": null
+  },
+  "dataset_sha256": "87b34663122e928ce4be469f6cf92d84c0b626339c30cdeb500e3b305d946cf2",
+  "split": "regression",
+  "variant": "refined",
+  "execute_threshold": 0.75,
+  "evaluation_boundary": "exposed-regression"
+}

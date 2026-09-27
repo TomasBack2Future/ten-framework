@@ -7,6 +7,8 @@ import json
 import os
 from pathlib import Path
 
+INTERRUPT_TIMEOUT_SECONDS = 5
+
 PLAN_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -70,7 +72,7 @@ class CodexBackend:
                 "request": record.request.text,
                 "existing_artifacts": existing,
                 "allowed_capabilities": list(config.allowed_capabilities),
-                "instruction": "Return a JSON file plan only. Create/modify local HTML/CSV/TXT/JSON artifacts. Do not execute commands, browse, send messages, install dependencies or use external tools. File names must be simple basenames. No scripts or external resources in HTML. Preserve unrelated content. At most four files, 64 KiB each.",
+                "instruction": "Return a JSON file plan only. Create/modify local HTML/CSV/TXT/JSON artifacts. Do not execute commands, browse, send messages, install dependencies or use external tools. File names must be simple basenames. No scripts or external resources in HTML. Return the complete desired artifact set, including unchanged files to retain; omitted previous files will be removed. At most four files, 64 KiB each.",
             },
             ensure_ascii=False,
         )
@@ -119,7 +121,13 @@ class CodexBackend:
             try:
                 result = await handle.run()
             except asyncio.CancelledError:
-                await asyncio.wait_for(handle.interrupt(), timeout=5)
+                try:
+                    await asyncio.wait_for(
+                        handle.interrupt(), timeout=INTERRUPT_TIMEOUT_SECONDS
+                    )
+                except Exception:  # pylint: disable=broad-exception-caught
+                    # Cleanup failure must not replace the original cancellation.
+                    pass
                 raise
             if (
                 str(getattr(result.status, "value", result.status))

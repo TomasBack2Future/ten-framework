@@ -55,7 +55,12 @@ speech interruption. Those stop speech only. Unrelated new turns do not fence
 background work. `await executor.close()` belongs in worker shutdown.
 
 Cancellation fences artifact commits before asking the SDK to interrupt, and
-never rolls back completed effects. Adjustment restarts generation in the same
+never rolls back completed effects. Internal cancellation generations are
+separate from public input revisions, so cancel revision 1 then adjust revision
+2 is valid. Per-task control locks serialize concurrent cancel/adjust requests;
+a lower revision cannot overwrite a newer one. Cancellation means the local
+commit fence is established; an SDK interrupt timeout/rejection cannot turn it
+into an error or emit a second terminal event. Adjustment restarts generation in the same
 task directory with existing artifact content, retaining task ID while replacing
 the SDK thread ID. This is explicit cancel-and-replace, not native model steering.
 Idempotency is worker-lifetime scoped: persistence/reconnect replay is not
@@ -66,7 +71,11 @@ implemented; allocate a new session after worker restart and do not replay tasks
 Only artifact creation/modification is allowed. SDK uses read-only sandbox,
 deny-all approvals, disabled shell tool/web search and no inherited shell env.
 A trusted Python writer accepts simple HTML/CSV/TXT/JSON basenames and bounded
-content after a revision fence. No file plan runs as code. Use a dedicated
+content after a revision fence. Each plan is a complete desired artifact snapshot:
+include unchanged files to retain them; previously managed files omitted from a
+successful new plan are removed. An empty plan removes all managed artifacts.
+Validation happens before writes, but filesystem I/O failure is not a transaction
+rollback guarantee. No file plan runs as code. Use a dedicated
 non-root container, clean CODEX_HOME, private work volume, no Docker socket,
 kubeconfig, production credentials or other service-provider secrets. Never
 mount the user's desktop Codex authentication. The only model credential is the
@@ -106,10 +115,23 @@ python3 -m executor.evaluate --dataset executor/.routing.jsonl --split dev \
   --output /tmp/dev-baseline.jsonl
 ```
 
-Repeat once with `--variant refined`, select only from dev, save selection, then
-run one `--split locked-test --variant refined --threshold 0.75`. Stored final
-results are already consumed; changing the prompt requires a new holdout.
-The scorer reports raw four-way confusion plus support and dispatch metrics.
+The existing 80 pilot examples are all exposed. Their original holdout claim
+was withdrawn after semantic-family review (see DATASET_PLAN.md). Reproduce the
+reviewed paired regression, using the frozen selection file and regenerated
+`.routing.jsonl` whose hash must match:
+
+```sh
+python3 -m executor.evaluate --dataset executor/.routing.jsonl --split regression \
+  --selection-lock executor/results/regression-selection.json \
+  --jev-key /secure/jev-key --scaledown-key /secure/scaledown-key \
+  --output /tmp/regression-paired.jsonl
+```
+
+Non-dev runs require a selection lock; omitted variant/threshold are read from
+it. Overrides conflicting with the lock or dataset/prompt checksum fail before
+API calls. `locked-test` additionally requires unseen-holdout metadata on both
+the lock and samples; legacy/exposed pilot data is rejected. A new holdout must
+be collected independently; regrouping or relabeling these samples is not enough.
 
 `python3 -m executor.ablation --backend fake ...` runs the same 12 sandbox tasks
 with three accepted turns through all-accepted / Jev / ScaleDown arms. Supply the
@@ -119,3 +141,18 @@ and executor credential. Fake runs only validate the comparison machinery; they
 cannot establish Codex success, speed, cost savings or a routing benefit.
 
 See DATASET_PLAN.md, data/bfcl-manifest.json, results/*.jsonl and REPORT.md.
+
+Reviewed CI: `task test-core` runs all 20 stdlib core/evaluation tests without
+SDK installation; `task test` runs all 23 including the SDK contracts. The
+ablation now reports terminal_state_success and dispatch_policy_success
+separately; unexpected dispatch fails combined success even if no file changed.
+To replay historical paired routing observations without new paid requests:
+
+```sh
+python3 -m executor.ablation --backend fake \
+  --cached-decisions executor/results/historical-v1/ablation-fake.jsonl \
+  --output /tmp/ablation-corrected.jsonl
+```
+
+Replayed route timings are historical observations combined with current fake
+execution timing, not a new end-to-end model latency measurement.

@@ -41,6 +41,7 @@ class Record:
     created: float = field(default_factory=time.monotonic)
     finished: float | None = None
     runner: asyncio.Task | None = field(default=None, repr=False)
+    control_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
 
 class Executor:
@@ -56,7 +57,7 @@ class Executor:
         self.backend = backend
         self.records = {}
         self.accepted = {}
-        self.latest = {}
+        self.generations = {}
         self.events = asyncio.Queue()
 
     def _emit(self, record, event):
@@ -100,8 +101,8 @@ class Executor:
         record = Record(task_id, request)
         self.records[task_id] = record
         self.accepted[key] = task_id
-        self.latest[task_id] = request.input_revision
-        record.runner = asyncio.create_task(self._run(record))
+        self.generations[task_id] = 0
+        record.runner = asyncio.create_task(self._run(record, 0))
         return task_id
 
     def status(self, session_id, task_id):
@@ -112,40 +113,57 @@ class Executor:
         return record
 
     async def cancel(self, session_id, task_id):
-        """Fence writes before cancellation; completed side effects remain."""
+        """Fence writes independently of public revisions; serialize controls."""
         record = self.status(session_id, task_id)
+        async with record.control_lock:
+            return await self._cancel_locked(record)
+
+    async def _cancel_locked(self, record):
+        """Caller owns control_lock. Cancellation is a local commit fence."""
         if record.status in ("completed", "cancelled", "error"):
             return record.status
-        self.latest[task_id] += 1
+        self.generations[record.task_id] += 1
         record.status = "cancelled"
         record.summary = "Task cancelled; completed changes are not rolled back"
-        record.runner.cancel()
-        await asyncio.gather(record.runner, return_exceptions=True)
         record.finished = time.monotonic()
         self._emit(record, "task.cancelled")
+        record.runner.cancel()
+        await asyncio.gather(record.runner, return_exceptions=True)
         return record.status
 
     async def adjust(self, session_id, task_id, revision, text):
-        """Cancel-and-replace within the same task directory, with a new version."""
+        """Serialize cancel-and-replace; recheck revision under the same lock."""
         record = self.status(session_id, task_id)
-        if revision <= max(record.request.input_revision, self.latest[task_id]):
-            raise ValueError("stale adjustment")
-        await self.cancel(session_id, task_id)
-        old = record.request
-        record.request = Request(session_id, old.turn_id, revision, text)
-        self.latest[task_id] = revision
-        record.status, record.summary = "queued", "Task adjusted"
-        record.finished = None
-        record.runner = asyncio.create_task(self._run(record))
-        return task_id
+        async with record.control_lock:
+            if revision <= record.request.input_revision:
+                raise ValueError("stale adjustment")
+            if not text.strip():
+                raise ValueError("invalid adjustment")
+            await self._cancel_locked(record)
+            old = record.request
+            record.request = Request(
+                session_id,
+                old.turn_id,
+                revision,
+                text,
+                capability=old.capability,
+            )
+            self.generations[task_id] += 1
+            record.status, record.summary = "queued", "Task adjusted"
+            record.finished = None
+            record.runner = asyncio.create_task(
+                self._run(record, self.generations[task_id])
+            )
+            return task_id
 
     async def close(self):
         """Terminate only tasks owned by this adapter."""
         for task_id, record in list(self.records.items()):
             await self.cancel(record.request.session_id, task_id)
 
-    async def _run(self, record):
-        version = record.request.input_revision
+    async def _run(self, record, generation):
+        if self.generations[record.task_id] != generation:
+            return
         record.status, record.summary = "running", "Creating local artifact"
         self._emit(record, "task.started")
         session_hash = hashlib.sha256(
@@ -154,18 +172,26 @@ class Executor:
         directory = (
             self.config.work_dir.resolve() / session_hash / record.task_id
         )
-        directory.mkdir(parents=True, exist_ok=True)
+        operation = None
         try:
-            plan = await asyncio.wait_for(
-                self.backend.run(record, directory, self.config),
-                timeout=self.config.timeout,
+            directory.mkdir(parents=True, exist_ok=True)
+            operation = asyncio.create_task(
+                self.backend.run(record, directory, self.config)
             )
-            if self.latest[record.task_id] != version:
+            plan = await asyncio.wait_for(
+                operation, timeout=self.config.timeout
+            )
+            if self.generations[record.task_id] != generation:
                 return
             files = self._validate_plan(plan, directory)
             # No await between the fence and commit: cancellation cannot interleave.
             for name, content in files:
                 (directory / name).write_text(content, encoding="utf-8")
+            # A plan is the complete desired artifact snapshot, not a patch.
+            desired_names = {name for name, _ in files}
+            for artifact in record.artifacts:
+                if artifact["name"] not in desired_names:
+                    (directory / artifact["name"]).unlink(missing_ok=True)
             record.artifacts = [
                 {
                     "name": name,
@@ -183,10 +209,19 @@ class Executor:
         except (
             Exception
         ) as exc:  # Boundary: never send provider exception text/secrets.
+            if self.generations[record.task_id] != generation:
+                return  # Late cancellation/cleanup failures cannot change a terminal.
             record.status = "error"
             record.summary = "Task failed: " + type(exc).__name__
             record.finished = time.monotonic()
             self._emit(record, "task.error")
+        finally:
+            # Python 3.10 wait_for can leave a cleanup exception unobserved
+            # when its outer task is cancelled. Always own/drain the operation.
+            if operation is not None:
+                if not operation.done():
+                    operation.cancel()
+                await asyncio.gather(operation, return_exceptions=True)
 
     def _validate_plan(self, plan, directory):
         files = plan.get("files", [])

@@ -10,7 +10,7 @@ from pathlib import Path
 import statistics
 
 from .config import RoutingConfig
-from .routing import Router, ROUTES
+from .routing import Router, ROUTES, BASELINE, REFINED
 
 
 def metrics(rows):
@@ -55,13 +55,65 @@ def metrics(rows):
     }
 
 
+def resolve_config(args):
+    """Freeze all non-dev evaluations to a dataset and prompt selection lock."""
+    if args.split == "dev":
+        return RoutingConfig(
+            variant=args.variant or "baseline",
+            execute_threshold=(
+                args.threshold if args.threshold is not None else 0.65
+            ),
+        )
+    if args.selection_lock is None:
+        raise ValueError("non-dev evaluation requires --selection-lock")
+    lock = json.loads(args.selection_lock.read_text())
+    digest = hashlib.sha256(args.dataset.read_bytes()).hexdigest()
+    if digest != lock["dataset_sha256"]:
+        raise ValueError("dataset does not match selection lock")
+    if lock.get("evaluation_boundary") not in (
+        "exposed-regression",
+        "unseen-holdout",
+    ):
+        raise ValueError("selection lock must declare evaluation boundary")
+    if (args.split == "locked-test") != (
+        lock["evaluation_boundary"] == "unseen-holdout"
+    ):
+        raise ValueError("split does not match declared evaluation boundary")
+    variant, threshold = lock["variant"], lock["execute_threshold"]
+    if variant not in ("baseline", "refined") or not 0 <= threshold <= 1:
+        raise ValueError("invalid locked configuration")
+    if args.variant is not None and args.variant != variant:
+        raise ValueError("variant conflicts with selection lock")
+    if args.threshold is not None and args.threshold != threshold:
+        raise ValueError("threshold conflicts with selection lock")
+    prompt = REFINED if variant == "refined" else BASELINE
+    if lock.get("prompt_sha256") != hashlib.sha256(prompt.encode()).hexdigest():
+        raise ValueError("prompt does not match selection lock")
+    return RoutingConfig(variant=variant, execute_threshold=threshold)
+
+
 async def run(args):
     """Run exactly one paired evaluation without automatic retries."""
     data = [json.loads(line) for line in args.dataset.read_text().splitlines()]
-    samples = [row for row in data if row["split"] == args.split]
-    config = RoutingConfig(
-        variant=args.variant, execute_threshold=args.threshold
-    )
+    config = resolve_config(
+        args
+    )  # Validate before reading keys or making calls.
+    samples = [
+        row for row in data if args.split in ("regression", row["split"])
+    ]
+    if not samples:
+        raise ValueError("evaluation selection is empty")
+    if args.split.startswith("regression") and any(
+        row.get("evaluation_boundary") != "exposed-regression"
+        for row in samples
+    ):
+        raise ValueError("regression data must declare prior exposure")
+    if args.split == "locked-test" and any(
+        row.get("evaluation_boundary") != "unseen-holdout" for row in samples
+    ):
+        raise ValueError(
+            "legacy/exposed samples cannot be called an unseen holdout"
+        )
     routers = {
         "jev": Router("jev", args.jev_key, config),
         "scaledown": Router("scaledown", args.scaledown_key, config),
@@ -81,7 +133,10 @@ async def run(args):
                     "split": sample["split"],
                     "kind": sample["kind"],
                     "provider": provider,
-                    "variant": args.variant,
+                    "variant": config.variant,
+                    "evaluation_boundary": sample.get(
+                        "evaluation_boundary", "legacy-unverified"
+                    ),
                     "gold": sample["gold"],
                     "stable": sample["input"]["stable"],
                 }
@@ -110,7 +165,13 @@ async def run(args):
     summary["dataset_sha256"] = hashlib.sha256(
         args.dataset.read_bytes()
     ).hexdigest()
-    summary["split"], summary["variant"] = args.split, args.variant
+    summary["split"], summary["variant"] = args.split, config.variant
+    summary["execute_threshold"] = config.execute_threshold
+    summary["evaluation_boundary"] = (
+        "exposed-regression"
+        if args.split.startswith("regression")
+        else "unseen-holdout" if args.split == "locked-test" else "dev"
+    )
     args.output.with_suffix(".summary.json").write_text(
         json.dumps(summary, indent=2) + "\n"
     )
@@ -122,12 +183,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument(
-        "--split", choices=("dev", "locked-test"), required=True
+        "--split",
+        choices=("dev", "locked-test", "regression-test", "regression"),
+        required=True,
     )
-    parser.add_argument(
-        "--variant", choices=("baseline", "refined"), required=True
-    )
-    parser.add_argument("--threshold", type=float, default=0.65)
+    parser.add_argument("--variant", choices=("baseline", "refined"))
+    parser.add_argument("--threshold", type=float)
+    parser.add_argument("--selection-lock", type=Path)
     parser.add_argument("--jev-key", type=Path, required=True)
     parser.add_argument("--scaledown-key", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)

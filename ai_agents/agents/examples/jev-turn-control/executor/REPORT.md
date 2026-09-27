@@ -1,147 +1,111 @@
-# Optional execution pilot — 2026-09-27
+# Reviewed executor pilot — 2026-09-27
 
-The isolated, default-disabled artifact execution module and reproducible pilot
-are implemented. They are ready for optional integration, not for unattended
-public execution. The locked test still exposes routing errors. No live Codex
-execution was performed because the authorized deployment credentials contain
-Soniox, Groq and Cartesia keys only, with no OpenAI/Codex credential.
+Seven independently reviewed defects are fixed in the default-disabled executor.
+See REVIEW_RESPONSE.md for each finding, its implementation and regression test.
+The source remains isolated under executor/; no graph, Web or deployment code
+is changed. This is a reviewable fix, not a merge/deployment approval.
 
-## Delivered behavior
+## Corrected execution behavior
 
-An async official SDK backend generates structured file plans under read-only
-permissions; a trusted writer bounds and validates artifact paths/content and
-checks task revisions before committing. A deterministic fake backend exercises
-the same adapter. Session/turn idempotency prevents partial/final duplication;
-explicit task cancel, replace/adjust and status are session-scoped. Ordinary
-conversation and stop-speech never cancel background tasks. Terminal effects are
-not rolled back. Shared voice graph/schema files are untouched. The SDK
-integration is pinned to openai-codex 0.157.1, verified against installed public
-Python signatures and mocked async transport contracts.
+Private cancellation generations are separate from public input revisions.
+Cancel revision 1 followed by adjust revision 2 is valid. Per-task control locks
+serialize overlapping changes and prevent revision regression. Cancellation
+establishes the local commit fence and emits one cancelled terminal; SDK interrupt
+failure or context cleanup failure cannot replace it with error. It does not
+promise rollback or remote interruption acknowledgement.
 
-The SDK runtime's model catalog in a fresh isolated CODEX_HOME contains
-`gpt-6-luna` with `low`, `medium`, `high`, `xhigh`, `max`, but not `none`.
-The account probe returns no account. This establishes catalog support only,
-not deployed account entitlement, successful inference, speed or price.
-The backend checks the deployed catalog and fails closed on unsupported effort;
-it does not substitute `minimal`, another model or a private credential.
+Artifact plans now specify the complete desired file set. Retained files must
+be included; omitted previously managed files are removed after the plan is
+validated and its new files written. An empty plan removes managed artifacts.
+Filesystem I/O failure is not a transaction rollback guarantee. Task cancellation
+still leaves completed side effects intact; partial ASR and speech-stop do not
+start/cancel tasks. Execution remains limited to bounded local artifacts through
+an official async SDK read-only plan and trusted writer.
 
-## Dataset and protocol
+## Evaluation validity correction
 
-80 routing examples: 64 self-authored bilingual cases (32 contrast families),
-8 original public BFCL inputs and 8 explicitly derived BFCL cases. Public text
-is download-only, pinned to Gorilla commit
-`6ea57973c7a6097fd7c5915698c54c17c5b1b6c8`; only source IDs, derivation metadata,
-labels and checksums are redistributed. The upstream repository has Apache-2.0
-code licensing; separate dataset redistribution terms were not established, so
-no raw or translated upstream text is vendored. ToolTalk and ToolSandbox were
-reviewed as alternatives and are not imported. See DATASET_PLAN.md.
+The old holdout claim is withdrawn: translated/semantic variants were split
+across dev and locked-test. All old reports, observations and checksums are
+retained unmodified under historical-v1/ for audit. The old 80.8% / 84.6%
+26-example figures must not be presented as independent holdout performance.
 
-Fixed seed 20260927, family grouping: 24 reserved train, 30 dev, 26 locked-test.
-All BFCL samples retain their evaluation role in locked-test, including linked
-base/missing-function/missing-parameter variants. Current/past user text and
-available capabilities are whitelisted; private initial state, gold call paths,
-future clarifications and source labels are never sent to classifiers. Labels
-are pilot author annotations, not independent human-reviewed Jev gold or an
-upstream four-class benchmark. Ambiguities are documented, not hidden.
+The explicit family audit groups 32 source scripts into 17 authored semantic
+families and preserves source IDs. Current bookkeeping is 28 train, 22 dev,
+30 regression-test (14 authored + 16 BFCL), but **all 80 samples are exposed**.
+Reassigning them does not produce new unseen evidence. Labels were not changed
+in response to predictions. A truly fresh holdout requires independently
+collected new families and a new frozen manifest.
 
-Both providers ran on the same IDs and model-visible input. Baseline then one
-predeclared refined prompt ran on dev. Thresholds 0.65, 0.75 and 0.85 were scored
-from cached dev probabilities; 0.75 was the lowest that removed the observed
-Jev false dispatch without lowering execute recall. The same prompt and
-threshold were locked for both providers before one locked-test run. No test
-retuning followed. The baseline file hashes the self-only input file; refined
-and locked runs hash the complete 80-example file. The actual dev sample IDs and
-contents are identical (30 self-authored examples) across both prompt runs.
-This is prompt/threshold tuning, not fine-tuning.
+A new paired regression over all 80 uses the same refined prompt and .75
+threshold, frozen before rerunning. No further tuning occurred. Selection locks
+now bind dataset SHA256, prompt SHA256, variant, threshold and exposure boundary.
+Non-dev CLI calls require that lock; omitted options load from it and conflicting
+options fail before credential reads/API calls. The locked-test path rejects
+legacy/exposed metadata. These are regression results, not generalization scores:
 
-## Routing results
+| Provider | N | Route accuracy | Execute precision | Execute recall | Support accuracy | False dispatch | p50 full decision |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Jev | 80 | 92.5% | 88.9% | 97.0% | 92.5% | 1/60 (1.67%) | 767 ms |
+| ScaleDown | 80 | 88.75% | 91.2% | 93.9% | 91.25% | 0/60 | 1746 ms |
 
-| Split / prompt | Provider | N | Route accuracy | Execute precision | Execute recall | Support accuracy | False dispatch rate | p50 complete decision |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| Dev baseline, .65 | Jev | 30 | 83.3% | 87.5% | 100% | 83.3% | 3.6% | 797 ms |
-| Dev baseline, .65 | ScaleDown | 30 | 76.7% | 87.5% | 100% | 86.7% | 0% | 1928 ms |
-| Dev refined, .65 | Jev | 30 | 96.7% | 87.5% | 100% | 96.7% | 3.6% | 796 ms |
-| Dev refined, .65 | ScaleDown | 30 | 83.3% | 85.7% | 85.7% | 96.7% | 0% | 1771 ms |
-| Locked refined, .75 | Jev | 26 | 80.8% | 75.0% | 92.3% | 80.8% | 5.9% | 792 ms |
-| Locked refined, .75 | ScaleDown | 26 | 84.6% | 86.7% | 100% | 76.9% | 0% | 1797 ms |
+Both saw identical inputs/IDs; no provider errors. Raw scores and complete
+confusion matrices are in results/regression-paired.jsonl and its summary.
+Only current/past context and capabilities reach the classifier, never gold,
+future turns or private task state. USD costs remain unknown. A Jev wrong
+new-task dispatch for an in-progress adjustment remains; these scores still
+do not justify enabling unattended public execution.
 
-False dispatch is execute + supported + stable on a non-actionable example.
-Locked Jev numerator/denominator is 1/17; ScaleDown is 0/17. This small sample
-cannot establish a production safety bound. Route metrics include partials,
-while dispatch metrics exclude them. No provider errors occurred. Jev performs
-two questions in one request; ScaleDown performs two concurrent requests and
-latency covers both. Token usage is recorded where returned; USD cost is null
-because reliable per-run billing was not available. Full confusion matrices
-and per-example scores are in results/*.summary.json and *.jsonl.
+## Corrected ablation and filesystem evidence
 
-Failure audit (labels frozen): both providers treated two BFCL mental-task
-examples (triangle arithmetic, translation) as execute/unsupported rather than
-conversation. Jev routed one in-progress page adjustment as new execution,
-which is the false-dispatch case, and missed one parameter clarification route.
-ScaleDown confused an English stop-reading request with task control, despite
-classifying support as unsupported. The task-control action/target must remain
-explicit at the host boundary; raw classification alone is not cancellation
-authority. The test lacks enough cases to estimate all control subtypes well.
+The original fake comparison conflated no side effects with correct routing.
+It now records terminal_state_success and dispatch_policy_success separately,
+plus unexpected_dispatch/missed_dispatch. Combined success requires both.
+A router that always dispatches explanation turns fails this assertion even
+when a fake executor returns no files.
 
-## Execution and streaming
+The corrected local run replays the original paired Jev/ScaleDown observations
+(no new provider calls) through the current artifact writer. Each arm has the
+same 12 tasks, 3 accepted turns per task and fixture backend:
 
-12 sandbox tasks cover HTML headings, CSV sums and JSON counts. All 12 fake
-fixtures passed independent assertions on actual files; model completion text
-was never the success oracle. These fixture-backed results validate lifecycle
-and artifact validation, not natural-language task solving by Codex.
+| Arm | Calls | Terminal state assertions | Dispatch gate assertions | Combined success | Unexpected dispatch |
+|---|---:|---:|---:|---:|---:|
+| Every accepted turn | 36 | 36/36 | 12/36 | 12/36 | 24 |
+| Jev + fake | 12 | 36/36 | 36/36 | 36/36 | 0 |
+| ScaleDown + fake | 12 | 36/36 | 36/36 | 36/36 | 0 |
 
-Streaming fixture: 20 duplicate deliveries produced 0 duplicate starts;
-0 stale artifact commits after cancel; stop-speech preserved background task.
-Measured task cancellation about 0.14 ms, first feedback about 0.39 ms, completion
-about 52 ms (fake delay 50 ms). These are local orchestration timings, not model
-or audio latency. Acoustic stop latency remains unmeasured; Full-Duplex-Bench
-and integrated Soniox/Groq/Cartesia voice tests remain a later phase.
+The all-accepted arm deliberately delegates every turn, so failing this specific
+dispatch gate does not prove a live model would perform an unwanted side effect.
+Separate terminal assertions keep that distinction visible. Historical routing
+time plus new fixture timing is a replay, not fresh end-to-end latency. No live
+Codex success/cost/speed benefit is claimed.
 
-Three-arm harness uses identical 12 tasks × 3 accepted turns, same fake backend,
-artifact writer and prior context. Each task has greeting, explanation-only,
-and actionable turns. Real Jev/ScaleDown classification was used; fake execution
-returns a known fixture for the actionable turn and an empty plan for the other
-two. This stub intentionally contains no model intelligence.
+12 sandbox fixtures pass real HTML/CSV/JSON file assertions. Streaming fixture
+checks zero duplicate starts after 20 repeats, no stale writes after cancel,
+and preserved tasks on speech-stop. Cancellation/feedback timings are fake local
+orchestration measurements, not model or acoustic latency. Full-Duplex-Bench
+and integrated Soniox/Groq/Cartesia voice timing remain the voice phase.
 
-| Arm | Backend calls | Verified task terminals | All turn assertions | Mean turn total latency |
-|---|---:|---:|---:|---:|
-| Every accepted turn | 36 | 12/12 | 36/36 | 13 ms |
-| Jev + same fake | 12 | 12/12 | 36/36 | 877 ms |
-| ScaleDown + same fake | 12 | 12/12 | 36/36 | 1881 ms |
+## Verification and live boundary
 
-Routing reduces fake dispatch count and adds latency in this fixture. No claim
-that Jev improves real Codex total latency, cost or success follows. The
-`--backend codex` harness is implemented but blocked on a dedicated authorized
-credential. An account-enabled bounded real run is necessary before making a
-model or architecture recommendation. GPT-6 Luna low is a configured candidate,
-not an empirically established fastest option.
+23 local tests pass, including SDK interrupt timeout, RPC rejection and context
+exit failures. All 20 stdlib core/evaluation tests run via `task test-core`;
+`task test` adds 3 SDK contract tests using installed openai-codex 0.157.1 and
+injected transport. Black check and Pylint 10.00/10 passed. Independent Ubuntu Python 3.10
+validation in a no-network public TEN build container passed all 20 core tests
+and 12 sandbox terminal assertions, with no unhandled cleanup exception.
 
-## Verification and delivery boundaries
+The SDK catalog probe from the original run listed GPT-6 Luna low, not none,
+in an isolated home with no account. This is catalog evidence only, not deployed
+account entitlement. No authorized OpenAI/Codex credential has been provided,
+so real executor and real three-arm validation remain blocked. No unrelated
+private credential is used and no production permission is added.
 
-- 14 local unittest cases passed, including official SDK call shape and active
-  interruption. Core regression covers disabled/partial/unsupported input,
-  duplicate delivery, cross-session controls, cancel-before-start, inflight
-  cancellation, no rollback of completed output, speech independence,
-  cancel-and-adjust, late result fencing, timeout/caps, invalid path plans and
-  classifier input projection.
-- Ubuntu x86_64 independent checkout and no-network public TEN build container:
-  Black formatting/check, Pylint 10.00/10, 12 core tests and 12 sandbox terminal
-  assertions passed. SDK transport tests ran locally against pinned SDK; the
-  no-network Ubuntu check did not install/invoke the optional SDK.
-- No C++ runtime rebuild, shared graph edit, production deployment, credential
-  transfer, official-upstream push or main merge. The shipping voice MVP stays
-  independent. Task cards and speech result hook are documented for the Web
-  integration owner; they are not claimed integrated here.
+The 16 BFCL cases are download-only, pinned with source IDs/checksums and separate
+original/derived labels. Public dataset text is not redistributed based solely
+on code licensing. ToolTalk, ToolSandbox and tau-Voice suitability/licensing
+notes remain in DATASET_PLAN.md. The result is not a BFCL leaderboard score or
+real customer-call benchmark.
 
-Known MVP limits: in-memory idempotency (new session required after restart),
-no durable job recovery, cancel-and-replace rather than native steer, task-level
-not detailed tool progress, operator-provisioned isolation required, artifact
-contents untrusted and only downloadable/sandbox-previewable. Automated live
-purchases, external messaging and production shell operations are out of scope.
-
-Official references: [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk),
-[App server](https://learn.chatgpt.com/docs/app-server),
-[Jev API](https://docs.typesafe.ai/api),
-[BFCL V3](https://gorilla.cs.berkeley.edu/blogs/13_bfcl_v3_multi_turn.html),
-[BFCL leaderboard](https://gorilla.cs.berkeley.edu/leaderboard),
-[tau-Voice architecture](https://github.com/sierra-research/tau2-bench/blob/main/src/tau2/voice/README.md).
+Final merge/deployment is gated by Grok re-review of the exact new SHA and the
+user's coordinated integration process. The Web owner must run the expanded
+`task test-core` rather than only the original adapter test file.
