@@ -46,7 +46,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 10v4m4-8v12m5-16v20m5-16v12m4-8v4" />
             </svg>
-            <div><strong>Soniox</strong><small>Live transcription</small></div>
+            <div><strong>ASR</strong><small>Live transcription</small></div>
           </article>
           <div id="edge-asr" class="connector"></div>
           <article
@@ -89,14 +89,14 @@
               <rect x="3" y="3" width="18" height="18" rx="3" />
               <path d="M7 8h10M7 12h10M7 16h6" />
             </svg>
-            <div><strong>Groq</strong><small>Compose reply</small></div>
+            <div><strong>LLM</strong><small>Compose reply</small></div>
           </article>
           <div id="edge-llm" class="connector"></div>
           <article id="node-tts" class="flow-node" data-state="idle">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 10v4m4-8v12m5-16v20m5-16v12m4-8v4" />
             </svg>
-            <div><strong>Cartesia</strong><small>Generate speech</small></div>
+            <div><strong>TTS</strong><small>Generate speech</small></div>
           </article>
           <div id="edge-tts" class="connector"></div>
           <article id="node-output" class="flow-node" data-state="idle">
@@ -285,7 +285,7 @@
               ></textarea></label
             ><label
               ><input type="checkbox" id="enable-compression" /> Background
-              memory compression (decision provider → Groq)</label
+              memory compression (decision provider → LLM)</label
             >
             <label
               >Compress after characters
