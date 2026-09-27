@@ -95,7 +95,7 @@ class JevTurnControlExtension(AsyncExtension):
             and self.engine.config["start"]["enabled"]
             and state.get("current")
             and state.get("version", 0) > self.executor_notified
-            and state.get("input_revision") == self.engine.revision
+            and state.get("input_revision") == self.executor.latest_revision
             and not (
                 self.engine.active
                 or self.engine.stopping
@@ -105,8 +105,9 @@ class JevTurnControlExtension(AsyncExtension):
             )
             and self.now() - self.engine.last_input >= 1000
         ):
-            self.executor_notified = state["version"]
-            self.engine.start("executor_result")
+            self.engine.start("executor_result", executor_state=state)
+            if self.engine.active:
+                self.executor_notified = state["version"]
 
     async def classify(self, request):
         try:

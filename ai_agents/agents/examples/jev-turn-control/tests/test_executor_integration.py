@@ -70,7 +70,7 @@ def test_duplicate_final_does_not_enqueue_twice_and_overflow_is_explicit():
         assert client.queue.qsize() == 1
         for revision in range(2, 10):
             client.submit(revision, "later", [])
-        assert client.failed
+        assert not client.failed
         assert events[-1][0] == "task.error"
         assert client.queue.qsize() == 8
 
@@ -169,7 +169,7 @@ def test_voice_mailbox_to_http_session_handles_followup_without_blocking():
                         )
                         client.submit(3, "😀" * 16000, ["😀" * 16000])
                         await until(lambda: len(call.backend.inputs) == 3)
-                        assert len(call.backend.inputs[-1]["text"]) == 16000
+                        assert len(call.backend.inputs[-1]["text"]) == 12000
                         assert not client.failed
                         call.backend.gates.put_nowait(result)
                         await until(
@@ -195,13 +195,14 @@ def test_result_notification_waits_for_voice_and_input_to_settle():
     extension.executor_notified = 0
     extension.engine.input("create file", True, 1, "one")
     extension.executor = SimpleNamespace(
+        latest_revision=1,
         state={
             "status": "completed",
             "current": True,
             "input_revision": 1,
             "version": 3,
             "notify_user": True,
-        }
+        },
     )
     extension.notify_executor()
     assert (
@@ -240,10 +241,15 @@ def test_result_notification_waits_for_voice_and_input_to_settle():
     extension.notify_executor()
     assert (
         extension.engine.active is None
-    )  # Old revision cannot interrupt correction.
+    )  # Fresh partial cannot interrupt the settling window.
+    extension.now = lambda: 4000
+    extension.notify_executor()
+    assert (
+        extension.engine.active is not None
+    )  # Abandoned partial is not a final fence.
 
 
-def test_old_result_is_not_current_for_new_foreground_input():
+def test_latest_final_result_remains_current_after_partial():
     engine = TurnEngine()
     engine.input("first", True, 0, "one")
     engine.input("correction", False, 1, "two")
@@ -259,4 +265,94 @@ def test_old_result_is_not_current_for_new_foreground_input():
             "summary": "old",
         },
     )
-    assert '"current": false' in request["prompt"]
+    assert '"current": true' in request["prompt"]
+
+
+def test_relay_uses_frozen_result_and_custom_prompt_keeps_contract():
+    engine = TurnEngine()
+    state = {
+        "status": "completed",
+        "current": True,
+        "summary": "museum plan ready",
+    }
+    engine.start("executor_result", executor_state=state)
+    action = engine.drain_actions()[0]
+    state["summary"] = "mutated"
+    request = memory.voice_request(
+        action,
+        Config.load({"voice": {"prompt": "Speak Chinese."}}),
+        {"status": "queued"},
+    )
+    assert "museum plan ready" in request["prompt"]
+    assert "mutated" not in request["prompt"]
+    assert "never wait for its completion" in request["prompt"]
+
+
+def test_remote_backpressure_preserves_session_and_retries_same_input():
+    import asyncio
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    async def check():
+        attempts, accepted, closed = [], [], []
+        gate = asyncio.Event()
+
+        async def create(_):
+            return web.json_response({"session_id": "same-call"})
+
+        async def submit(request):
+            item = await request.json()
+            attempts.append(item)
+            if not gate.is_set():
+                raise web.HTTPTooManyRequests()
+            accepted.append(item)
+            return web.json_response({"status": "queued"}, status=202)
+
+        async def status(_):
+            return web.json_response({"status": "running", "version": 1})
+
+        async def close(_):
+            closed.append(True)
+            return web.json_response({"status": "closed"})
+
+        app = web.Application()
+        app.router.add_post("/sessions", create)
+        app.router.add_post("/sessions/same-call/inputs", submit)
+        app.router.add_get("/sessions/same-call", status)
+        app.router.add_delete("/sessions/same-call", close)
+        async with TestServer(app) as server:
+            with patch.dict(
+                os.environ,
+                {
+                    "JEV_CODEX_ENABLED": "true",
+                    "JEV_EXECUTOR_URL": str(server.make_url("")),
+                    "JEV_EXECUTOR_TOKEN": "x" * 32,
+                },
+            ):
+                client = client_module.ExecutorClient(
+                    lambda *_: None, enabled=True
+                )
+                client.start()
+                client.submit(1, " first ", [])
+                try:
+                    for _ in range(100):
+                        if len(attempts) >= 2:
+                            break
+                        await asyncio.sleep(0.02)
+                    assert (
+                        len(attempts) >= 2 and not closed and not client.failed
+                    )
+                    gate.set()
+                    client.submit(2, "second", [])
+                    for _ in range(100):
+                        if len(accepted) == 2:
+                            break
+                        await asyncio.sleep(0.02)
+                    assert [x["input_revision"] for x in accepted] == [1, 2]
+                    assert accepted[0]["text"] == "first"
+                    assert client.sid == "same-call"
+                finally:
+                    await client.close()
+                assert closed == [True]
+
+    asyncio.run(check())

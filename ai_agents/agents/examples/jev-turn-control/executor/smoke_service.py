@@ -16,6 +16,7 @@ from .probe import probe
 def main():
     """Run in the non-root, read-only image with network none and private tmpfs."""
     assert os.geteuid() != 0
+    assert Path("/opt/jev/executor-image").is_file()
     assert not os.environ.get("OPENAI_API_KEY")
     result = asyncio.run(probe())
     assert result["sdk"] == "0.157.1" and not result["account_present"]

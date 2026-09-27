@@ -37,14 +37,26 @@ class ExecutorClient:
             self.queue.put_nowait(
                 {
                     "input_revision": revision,
-                    "text": text,
+                    "text": " ".join(text[:12000].split()),
                     "context": json.dumps(context, ensure_ascii=False)[-16000:],
                 }
             )
             self.latest_revision = revision
             self.state = {"status": "queued", "input_revision": revision}
         except asyncio.QueueFull:
-            self.fail("input_capacity")
+            self.input_error("input_capacity", revision)
+
+    def input_error(self, code, revision):
+        """Reject only this input; keep the call and accepted work alive."""
+        self.emit(
+            "task.error",
+            {
+                "task_id": "call-executor",
+                "status": "error",
+                "code": code,
+                "input_revision": revision,
+            },
+        )
 
     def fail(self, code):
         self.failed = True
@@ -59,6 +71,11 @@ class ExecutorClient:
         async with self.client.request(
             method, self.url + path, json=payload, allow_redirects=False
         ) as response:
+            if method == "POST" and path.endswith("/inputs"):
+                if response.status == 429:
+                    return {"retry": True}
+                if response.status == 400:
+                    return {"rejected": True}
             if response.status not in (200, 201, 202):
                 raise ValueError("executor unavailable")
             body = bytearray()
@@ -86,20 +103,36 @@ class ExecutorClient:
                 created = await self.request("POST", "/sessions")
                 self.sid = created["session_id"]
                 path = "/sessions/" + self.sid
+                pending = None
                 try:
                     while not self.failed:
-                        try:
-                            item = await asyncio.wait_for(self.queue.get(), 0.2)
-                        except asyncio.TimeoutError:
-                            item = None
-                        if item is not None:
-                            await self.request("POST", path + "/inputs", item)
+                        if pending is None:
+                            try:
+                                pending = await asyncio.wait_for(
+                                    self.queue.get(), 0.2
+                                )
+                            except asyncio.TimeoutError:
+                                pass
+                        if pending is not None:
+                            admitted = await self.request(
+                                "POST", path + "/inputs", pending
+                            )
+                            if admitted.get("retry"):
+                                await asyncio.sleep(0.2)
+                            else:
+                                if admitted.get("rejected"):
+                                    self.input_error(
+                                        "input_rejected",
+                                        pending["input_revision"],
+                                    )
+                                pending = None
                         state = await self.request("GET", path)
                         if state["version"] > self.last_version:
                             self.last_version = state["version"]
                             # If newer inputs are still local, an old completion is not current.
                             state["current"] = (
-                                self.queue.empty()
+                                pending is None
+                                and self.queue.empty()
                                 and state.get("input_revision", 0)
                                 >= self.latest_revision
                             )

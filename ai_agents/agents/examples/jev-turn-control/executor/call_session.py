@@ -60,7 +60,10 @@ class SessionBackend:
         )
 
         if self.client_factory is None:
-            if not Path("/.dockerenv").exists() or os.geteuid() == 0:
+            if (
+                not Path("/opt/jev/executor-image").is_file()
+                or os.geteuid() == 0
+            ):
                 raise RuntimeError("non-root executor container required")
             if not os.environ.get("OPENAI_API_KEY"):
                 raise RuntimeError("missing executor credential")
@@ -92,7 +95,9 @@ class SessionBackend:
             "current_artifacts": {
                 p.name: p.read_text()
                 for p in self.directory.iterdir()
-                if p.is_file()
+                if not p.is_symlink()
+                and p.is_file()
+                and p.stat().st_size <= self.config.max_artifact_bytes
             },
         }
         self.handle = await self.thread.turn(

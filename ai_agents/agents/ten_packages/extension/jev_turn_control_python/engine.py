@@ -458,7 +458,7 @@ class TurnEngine:
             self.guidance_sent = False
         self.start("answer" if label == "answer" else "clarify")
 
-    def start(self, mode):
+    def start(self, mode, executor_state=None):
         if self.active or self.stopping or self.closed:
             return
         cfg = self.config["compression"]
@@ -520,6 +520,7 @@ class TurnEngine:
             input_revision=self.revision,
             response_id=rid,
             mode=mode,
+            executor_state=deepcopy(executor_state),
             input_text="" if mode == "executor_result" else self.text,
             context=deepcopy(self.history),
             summary=self.summary,

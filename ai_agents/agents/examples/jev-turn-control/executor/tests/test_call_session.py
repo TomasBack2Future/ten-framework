@@ -189,6 +189,9 @@ class CallSessionTests(unittest.IsolatedAsyncioTestCase):
         backend = SessionBackend(
             Path(self.temp.name), self.manager.config, lambda: client
         )
+        (backend.directory / "safe.txt").write_text("safe")
+        (backend.directory / "private.txt").symlink_to("safe.txt")
+        (backend.directory / "oversized.txt").write_text("x" * 65537)
         for text in ("first", "second"):
             await backend.run({"text": text})
         self.assertEqual(client.thread_start.await_count, 1)
@@ -196,5 +199,7 @@ class CallSessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             json.loads(thread.turn.call_args_list[1].args[0])["text"], "second"
         )
+        payload = json.loads(thread.turn.call_args_list[1].args[0])
+        self.assertEqual(payload["current_artifacts"], {"safe.txt": "safe"})
         await backend.close()
         client.__aexit__.assert_awaited_once()

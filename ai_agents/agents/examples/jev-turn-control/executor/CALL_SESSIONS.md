@@ -18,7 +18,7 @@ The voice-side mailbox returns immediately and sends HTTP requests in a separate
 task. The main brain receives a quoted status snapshot with its normal prompt
 and continues talking while work runs. Completed relevant results are announced
 only after voice playback and pending user input settle, and only when the
-result revision still matches current input. Plain conversation does not create
+result revision still matches the latest queued final input. Plain conversation does not create
 an extra spoken notification. Results never directly enter TTS or pretend to be
 new user utterances. Speech stop/pause do not cancel executor work.
 
@@ -86,7 +86,10 @@ executor unavailable. Voice remains usable. Start a new call to recover.
 
 Per replica: 8 calls, 8 pending inputs/call, 256 accepted inputs/call, 60-second
 model timeout, 15-minute idle input TTL. Polling does not extend TTL. Limits and
-network failures are explicit errors, not silently dropped input or retries.
+network failures are explicit errors. A full remote queue retries the same input
+without replacing the thread. Local queue overflow rejects only the extra input
+with an observable capacity error; accepted work remains alive. Invalid bodies
+are rejected per input. Ambiguous network failures are never replayed.
 Duplicate identical revisions are acknowledged once; conflicting/stale revisions
 are rejected. Recent model plans are not a source of truth for committed files.
 
@@ -104,3 +107,9 @@ fences, duplicate admission, bounds, close/error/restart behavior, API auth,
 disabled mode, nonblocking voice and result prompt/history semantics. SDK tests
 inject transport responses; they do not establish paid model behavior or account
 entitlement. No live credential or deployment is part of this PR.
+
+The image supplies `/opt/jev/executor-image` for runtime identification; it does
+not depend on Docker Engine creating `/.dockerenv`. Non-root execution is required.
+Verify kubelet health-probe reachability with the target CNI before enablement.
+Generated HTML is untrusted and is not rendered or served by this P1; a future
+download/preview path must enforce sandboxing and content policy before rendering.
