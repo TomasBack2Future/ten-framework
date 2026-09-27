@@ -289,3 +289,22 @@ def test_finished_context_is_bounded():
     assert len(engine.finished) == 2
     assert len(engine.history) == 2
     assert not engine.responses
+
+
+def test_main_reply_preempts_backchannel_playback():
+    engine = make(backchannel={"enabled": True})
+    engine.input("I am still thinking", False, 0)
+    request = engine.begin_decision(120)
+    engine.complete_decision(
+        request,
+        {"start": answer("continuation"), "backchannel": answer("backchannel")},
+        200,
+    )
+    rid = engine.active
+    engine.tick(1600)
+    assert engine.stopping == rid and engine.active is None
+    assert engine.drain_actions()[-1]["reason"] == "main_response_priority"
+    engine.playback(rid, 400, 1620, stopped=True)
+    engine.tick(1621)
+    assert engine.active != rid
+    assert engine.responses[engine.active]["mode"] == "clarify"

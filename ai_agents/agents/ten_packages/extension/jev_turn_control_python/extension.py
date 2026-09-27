@@ -132,7 +132,9 @@ class JevTurnControlExtension(AsyncExtension):
                 )
                 self.engine.output(rid, text, self.now(), final=True)
                 if self.engine.config["transport"]["mock_audio"]:
-                    for _ in range(100):
+                    for _ in range(
+                        10 if action["mode"] == "backchannel" else 100
+                    ):
                         if rid != self.engine.active:
                             break
                         await self.mock_audio(rid)
