@@ -74,6 +74,11 @@ test("gateway enforces auth, origin, settings, single session, snapshot and clea
     200,
   );
   assert.equal((await post("/api/session", {}, cookie)).status, 409);
+  assert.equal(
+    (await post("/api/end", { session_id: "stale-session" }, cookie)).status,
+    200,
+  );
+  assert.equal((await post("/api/session", {}, cookie)).status, 409);
   const ws = new WebSocket(`ws://localhost:${port}/ws`, {
     headers: { Origin: origin, Cookie: cookie },
   });

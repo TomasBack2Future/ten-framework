@@ -237,7 +237,9 @@ class OpenAIChatGPT:
                 self.ten_env.log_debug(f"set openai param: {key} = {value}")
                 req[key] = value
 
-        self.ten_env.log_info(f"Requesting chat completions with: {req}")
+        self.ten_env.log_info(
+            f"Requesting chat completions: message_count={len(req['messages'])}"
+        )
 
         try:
             response: AsyncStream[ChatCompletionChunk] = (

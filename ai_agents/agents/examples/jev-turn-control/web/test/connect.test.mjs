@@ -1,0 +1,111 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+for (const failure of ["unlock", "busy", "initialize", "cleanup"]) {
+  test(`Connect recovers from ${failure} and retries`, async (t) => {
+    const originals = new Map();
+    const replace = (name, value) => {
+      originals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+      Object.defineProperty(globalThis, name, {
+        configurable: true,
+        writable: true,
+        value,
+      });
+    };
+    t.after(() => {
+      for (const [name, descriptor] of originals)
+        if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+        else delete globalThis[name];
+    });
+    const elements = new Map();
+    const get = (id) => {
+      if (!elements.has(id))
+        elements.set(id, {
+          disabled: false,
+          checked: false,
+          value: "",
+          textContent: "",
+          hidden: false,
+          replaceChildren() {},
+        });
+      return elements.get(id);
+    };
+    let broken = true,
+      closed = 0;
+    const requests = [];
+    replace("document", { getElementById: get });
+    replace("window", { addEventListener() {} });
+    replace("location", { protocol: "https:", host: "demo.test" });
+    replace("setInterval", () => 123);
+    replace("clearInterval", () => {});
+    replace(
+      "AudioContext",
+      class {
+        async resume() {
+          if (broken && failure === "unlock") throw new Error("unlock failed");
+        }
+        async close() {
+          closed++;
+        }
+      },
+    );
+    replace(
+      "WebSocket",
+      class {
+        static OPEN = 1;
+        constructor() {
+          if (broken && ["initialize", "cleanup"].includes(failure))
+            throw new Error("initialization failed");
+        }
+        close() {}
+      },
+    );
+    replace("fetch", async (path, options) => {
+      const body = options ? JSON.parse(options.body) : null;
+      requests.push({ path, body });
+      const error =
+        broken &&
+        ((failure === "busy" && path === "/api/session") ||
+          (failure === "cleanup" && path === "/api/end"));
+      return {
+        ok: !error,
+        status: error ? 409 : 200,
+        json: async () =>
+          error
+            ? { error: "busy or cleanup failed" }
+            : path === "/api/config"
+              ? { mode: "mock", revision: "test", authenticated: true }
+              : { session_id: "created-by-this-attempt" },
+      };
+    });
+    await import(`../public/app.js?failure=${failure}`);
+    await new Promise((resolve) => setImmediate(resolve));
+    await get("connect").onclick();
+    assert.equal(get("connect").disabled, false);
+    assert.equal(get("voice-prompt").disabled, false);
+    assert.equal(get("mic").disabled, true);
+    assert.equal(closed, 1);
+    const cleanup = requests.filter((x) => x.path === "/api/end");
+    assert.equal(
+      cleanup.length,
+      ["initialize", "cleanup"].includes(failure) ? 1 : 0,
+    );
+    if (cleanup.length)
+      assert.deepEqual(cleanup[0].body, {
+        session_id: "created-by-this-attempt",
+      });
+    if (failure === "unlock")
+      assert.equal(
+        requests.some((x) => x.path === "/api/session"),
+        false,
+      );
+    if (failure === "cleanup") assert.equal(get("end").disabled, false);
+    broken = false;
+    const retryStart = requests.length;
+    await get("connect").onclick();
+    assert.equal(get("connect").disabled, true);
+    assert.equal(get("voice-prompt").disabled, true);
+    if (failure === "cleanup")
+      assert.equal(requests[retryStart].path, "/api/end");
+  });
+}

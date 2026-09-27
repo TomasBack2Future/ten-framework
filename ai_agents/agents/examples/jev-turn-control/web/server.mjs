@@ -252,10 +252,14 @@ const server = http.createServer(async (req, res) => {
       if (!allowed(req))
         return json(res, 401, { error: "Enter the demo access code" });
       if (req.url === "/api/end") {
+        const request = await body(req);
         if (session && session.owner !== cookie(req))
           return json(res, 403, {
             error: "Session belongs to another visitor",
           });
+        // A delayed failed-Connect cleanup must not stop a newer session.
+        if (request.session_id && session?.id !== request.session_id)
+          return json(res, 200, { ok: true });
         stop();
         return json(res, 200, { ok: true });
       }

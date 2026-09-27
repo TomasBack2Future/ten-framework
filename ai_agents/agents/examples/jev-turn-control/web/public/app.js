@@ -211,9 +211,30 @@ function openSocket() {
   };
   socket.onerror = () => status("Connection interrupted");
 }
+const settingIds = [
+  "enable-start",
+  "enable-stop",
+  "enable-backchannel",
+  "voice-prompt",
+  "enable-compression",
+  "compression-chars",
+  "compression-turns",
+  "compression-timeout",
+  "compression-prompt",
+  "summary-prompt",
+  "prompt",
+  "apply",
+];
 $("connect").onclick = async () => {
+  let connected = false;
   try {
     $("connect").disabled = true;
+    $("error").textContent = "";
+    // Retry a previously failed cleanup before creating another graph.
+    if (session) {
+      await api("/api/end", { session_id: session.session_id });
+      session = null;
+    }
     await player.unlock();
     session = await api("/api/session", {
       ...debug.settings(),
@@ -231,21 +252,7 @@ $("connect").onclick = async () => {
         "compression.summary_prompt": $("summary-prompt").value,
       },
     });
-    for (const id of [
-      "enable-start",
-      "enable-stop",
-      "enable-backchannel",
-      "voice-prompt",
-      "enable-compression",
-      "compression-chars",
-      "compression-turns",
-      "compression-timeout",
-      "compression-prompt",
-      "summary-prompt",
-      "prompt",
-      "apply",
-    ])
-      $(id).disabled = true;
+    for (const id of settingIds) $(id).disabled = true;
     store.reset();
     taskCards.clear();
     $("tasks").replaceChildren();
@@ -254,8 +261,32 @@ $("connect").onclick = async () => {
     $("connect").disabled = true;
     closing = false;
     openSocket();
+    connected = true;
   } catch (e) {
-    fail(e);
+    closing = true;
+    clearTimeout(reconnectTimer);
+    socket?.close();
+    let cleanupError;
+    if (session) {
+      try {
+        await api("/api/end", { session_id: session.session_id });
+        session = null;
+      } catch (error) {
+        cleanupError = error;
+      }
+    }
+    await player.destroy().catch(() => {});
+    for (const id of settingIds) $(id).disabled = false;
+    for (const id of ["mic", "stop", "replay", "send-text"])
+      $(id).disabled = true;
+    $("end").disabled = !session;
+    fail(
+      cleanupError
+        ? `${e.message}; session cleanup failed: ${cleanupError.message}. Retry Connect to clean up.`
+        : e,
+    );
+  } finally {
+    $("connect").disabled = connected;
   }
 };
 $("end").onclick = async () => {
@@ -267,21 +298,7 @@ $("end").onclick = async () => {
   socket?.close();
   await api("/api/end", {}).catch(fail);
   session = null;
-  for (const id of [
-    "enable-start",
-    "enable-stop",
-    "enable-backchannel",
-    "voice-prompt",
-    "enable-compression",
-    "compression-chars",
-    "compression-turns",
-    "compression-timeout",
-    "compression-prompt",
-    "summary-prompt",
-    "prompt",
-    "apply",
-  ])
-    $(id).disabled = false;
+  for (const id of settingIds) $(id).disabled = false;
   $("connect").disabled = false;
   for (const id of ["mic", "stop", "end", "replay", "send-text"])
     $(id).disabled = true;

@@ -261,7 +261,13 @@ def test_official_adapter_final_http_messages_keep_history(monkeypatch):
     assert [m["role"] for m in wire] == ["system", "user", "assistant", "user"]
     assert wire[1]["content"] == "My name is Maya."
     assert wire[2]["content"] == "Hello Maya."
-    assert "private-test-key" not in " ".join(logs)
+    for private_text in [
+        "private-test-key",
+        "My name is Maya.",
+        "Hello Maya.",
+        wire[0]["content"],
+    ]:
+        assert private_text not in " ".join(logs)
 
 
 def test_late_stop_ack_repairs_old_context_without_touching_new_response():
@@ -476,3 +482,33 @@ def test_summary_payload_validation_and_job_cleanup(monkeypatch):
 
     for mode in ("malformed", "unexpected", "timeout", "cancel"):
         asyncio.run(run(mode))
+
+
+def test_shutdown_sends_tts_flush_before_llm_abort():
+    import asyncio
+
+    extension = importlib.import_module(f"{PACKAGE}.extension")
+    adapter = extension.JevTurnControlExtension("shutdown_wire")
+    adapter.engine = TurnEngine(Config.load({"provider": {"name": "jev"}}))
+    adapter.engine.text = "Hello"
+    adapter.engine.start("answer")
+    rid = adapter.engine.active
+    operations = []
+
+    async def send_data(name, payload, destination):
+        operations.append((name, payload, destination))
+
+    async def send_cmd(command):
+        operations.append(
+            (command.get_name(), command.get_property_string("request_id")[0])
+        )
+
+    adapter.send_data = send_data
+    adapter.ten_env = types.SimpleNamespace(
+        send_cmd=send_cmd, log_info=lambda *_: None
+    )
+    asyncio.run(adapter.on_stop(adapter.ten_env))
+    assert operations == [
+        ("tts_flush", {"flush_id": rid}, "tts"),
+        ("abort", rid),
+    ]
