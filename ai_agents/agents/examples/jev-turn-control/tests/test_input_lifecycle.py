@@ -247,3 +247,54 @@ def test_same_words_in_new_segment_are_a_new_input_cycle():
     assert request["state"]["input_text"] == "Tell me the weather?"
     engine.tick(1300)
     assert engine.active and engine.active != rid
+
+
+@pytest.mark.parametrize("label", ["answer", "ignore", "explicit_wait"])
+@pytest.mark.parametrize("ack", [True, False])
+def test_backchannel_stop_discards_joint_start_until_floor_release(label, ack):
+    engine = make(backchannel={"enabled": True})
+    engine.input("Still thinking", False, 0, "s1")
+    request = engine.begin_decision(120)
+    engine.complete_decision(
+        request,
+        {"start": answer("continuation"), "backchannel": answer("backchannel")},
+        200,
+    )
+    rid = engine.active
+    assert rid
+    engine.input("Synthetic next input", True, 700, "s2")
+    request = engine.begin_decision(850)
+    assert request["kinds"] == ["stop", "start"]
+    # Delay the result past max-wait: stop wins, so this start was not applied.
+    engine.complete_decision(
+        request, {"stop": answer("stop"), "start": answer(label)}, 5800
+    )
+    assert engine.stopping == rid
+    if ack:
+        engine.playback(rid, 100, 5900, stopped=True)
+    engine.tick(6300)
+    assert not engine.active and not engine.stopping and engine.pending
+    request = engine.begin_decision(6300)
+    assert request is not None and "start" in request["kinds"]
+    engine.complete_decision(request, {"start": answer(label)}, 6400)
+    engine.tick(6401)
+    assert bool(engine.active) == (label == "answer")
+    assert not engine.pending
+
+
+@pytest.mark.parametrize("label", ["answer", "ignore", "explicit_wait"])
+def test_successful_start_recovers_hold_after_stop_provider_error(label):
+    engine = make(provider={"failure_policy": "hold"})
+    rid = start(engine)
+    engine.input("Synthetic overlap", True, 500, "s2")
+    request = engine.begin_decision(650)
+    assert request["kinds"] == ["stop"]
+    engine.complete_decision(request, {}, 1450, error=True)
+    engine.playback(rid, 5000, 6000, completed=True)
+    engine.tick(6003)
+    assert not engine.active
+    decide(engine, 6010, label)
+    engine.tick(6100)
+    assert bool(engine.active) == (label == "answer")
+    assert not engine.pending
+    assert not engine.failed
