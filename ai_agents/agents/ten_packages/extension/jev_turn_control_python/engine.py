@@ -492,6 +492,7 @@ class TurnEngine:
             "expected_audio_ms": None,
             "unverified_completion": False,
             "audio_ms": 0,
+            "audio_chunk_floor_ms": 0,
             "fully_played": False,
         }
         if mode not in ("backchannel", "executor_result"):
@@ -580,6 +581,8 @@ class TurnEngine:
             if timestamp is not None and response["audio_origin_ms"] is None:
                 response["audio_origin_ms"] = timestamp - response["audio_ms"]
             response["audio_ms"] += duration_ms
+            # Cartesia/TEN reports the sum of integer-truncated chunk durations.
+            response["audio_chunk_floor_ms"] += int(duration_ms)
             if completed:
                 valid = (
                     normal
@@ -737,10 +740,15 @@ class TurnEngine:
             and response["generation_done"]
             and response["audio_done"]
             and response["audio_ms"] > 0
-            # Provider duration and forwarded PCM duration are both milliseconds.
-            # 2 ms covers integer rounding, not missing audio chunks.
+            # Accept either a rounded total or the exact sum of per-chunk
+            # integer durations used by Cartesia. Do not widen the tolerance:
+            # missing/duplicated chunks must also change this independent sum.
             and response["expected_audio_ms"] is not None
-            and abs(response["audio_ms"] - response["expected_audio_ms"]) <= 2
+            and (
+                abs(response["audio_ms"] - response["expected_audio_ms"]) <= 2
+                or response["expected_audio_ms"]
+                == response["audio_chunk_floor_ms"]
+            )
             and response["played_ms"] >= response["audio_ms"] - 30
         )
         response["unverified_completion"] = (
