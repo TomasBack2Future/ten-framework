@@ -29,6 +29,7 @@ def answer(label="answer", score=0.95):
 
 
 def make(**options):
+    options.setdefault("provider", {}).setdefault("profile", "baseline")
     return TurnEngine(Config.load(options), "test")
 
 

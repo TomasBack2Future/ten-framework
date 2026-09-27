@@ -1,0 +1,195 @@
+{
+  "date": "2026-09-27",
+  "environment": "khipaa isolated non-serving Pod; removed after test",
+  "scope": "provider wire-contract smoke, not accuracy or audio latency acceptance",
+  "profile": "identical selected Jev instructions/criteria for all modes; no retuning",
+  "total_timeout_ms": 800,
+  "decision_calls": 18,
+  "http_requests": 24,
+  "successes": 18,
+  "source_sha256": {
+    "config.py": "f3d40ed9457fde01b8018914e5c4f4c6ffdaba57ac88f4de77a408bc02b706a2",
+    "profiles.py": "64a1c31ad7722bda1106c52c885e84a64e4fb08baa7fc30d2aaa5f277b8e9901",
+    "provider.py": "4f2d279ff6149e8cb931b2786eb448e3dc3412ded27d49df85ab3ed4f255e81e",
+    "decision_profiles.json": "b4f800f96afa4e95da3a5547c776e6d4fa1a42bd20ba768684af85743337c95a",
+    "baseline_questions.json": "830d6cc2bb36d541d0eff91fb24a0efec022a4d88ca617f73715da8c92cfd193"
+  },
+  "cases": [
+    {
+      "kind": "start",
+      "id": "pause-105:terminal@start",
+      "input_sha256": "29e3780eebd87a8f6928417fd2d4874685f73364967b3a898e9b331d145caeae"
+    },
+    {
+      "kind": "stop",
+      "id": "interrupt-104:terminal@stop",
+      "input_sha256": "95c2f900973f49efbb3c9f61b942c17b359b31d628522fe382ea9980b50dc04e"
+    },
+    {
+      "kind": "backchannel",
+      "id": "authored-library:narrative@backchannel",
+      "input_sha256": "7076029aa91710351a149127e4f8c44217ae97185c350a070f4eed8c5ec2ab2a"
+    },
+    {
+      "kind": "compression",
+      "id": "authored-library:compression-short@compression",
+      "input_sha256": "ba77c270d0aa5ec83150e49fdafd427f9d8523a9b81d6e9b92af3b06324d6781"
+    },
+    {
+      "kind": "route",
+      "id": "simple_python_16:original@route",
+      "input_sha256": "e98a8c840e076a4db2e1cd4635e8858fb848eb2cefad9af3f7e8fbfa35ebbc79"
+    },
+    {
+      "kind": "support",
+      "id": "simple_python_16:no-capability@support",
+      "input_sha256": "12c5acccf4c54db593fc10dfd10fb52d97993fb2f8e54580ddc80f78529cbc11"
+    }
+  ],
+  "results": [
+    {
+      "mode": "jev",
+      "kind": "start",
+      "ok": true,
+      "label": "answer",
+      "score": 0.91,
+      "latency_ms": 156.9
+    },
+    {
+      "mode": "jev",
+      "kind": "stop",
+      "ok": true,
+      "label": "stop",
+      "score": 0.84,
+      "latency_ms": 67.51
+    },
+    {
+      "mode": "jev",
+      "kind": "backchannel",
+      "ok": true,
+      "label": "backchannel",
+      "score": 0.92,
+      "latency_ms": 72.05
+    },
+    {
+      "mode": "jev",
+      "kind": "compression",
+      "ok": true,
+      "label": "retain",
+      "score": 0.95,
+      "latency_ms": 82.82
+    },
+    {
+      "mode": "jev",
+      "kind": "route",
+      "ok": true,
+      "label": "execute",
+      "score": 1.0,
+      "latency_ms": 109.53
+    },
+    {
+      "mode": "jev",
+      "kind": "support",
+      "ok": true,
+      "label": "unsupported",
+      "score": 0.85,
+      "latency_ms": 94.3
+    },
+    {
+      "mode": "sd",
+      "kind": "start",
+      "ok": true,
+      "label": "answer",
+      "score": 0.8437879038627704,
+      "latency_ms": 511.04
+    },
+    {
+      "mode": "sd",
+      "kind": "stop",
+      "ok": true,
+      "label": "stop",
+      "score": 0.9669132504082011,
+      "latency_ms": 265.2
+    },
+    {
+      "mode": "sd",
+      "kind": "backchannel",
+      "ok": true,
+      "label": "backchannel",
+      "score": 0.8175736487058302,
+      "latency_ms": 266.01
+    },
+    {
+      "mode": "sd",
+      "kind": "compression",
+      "ok": true,
+      "label": "retain",
+      "score": 0.9525728251572158,
+      "latency_ms": 257.0
+    },
+    {
+      "mode": "sd",
+      "kind": "route",
+      "ok": true,
+      "label": "execute",
+      "score": 0.9924175815102038,
+      "latency_ms": 262.24
+    },
+    {
+      "mode": "sd",
+      "kind": "support",
+      "ok": true,
+      "label": "unsupported",
+      "score": 0.9913579109952593,
+      "latency_ms": 263.9
+    },
+    {
+      "mode": "sd_jev",
+      "kind": "start",
+      "ok": true,
+      "label": "answer",
+      "score": 0.92,
+      "latency_ms": 357.86
+    },
+    {
+      "mode": "sd_jev",
+      "kind": "stop",
+      "ok": true,
+      "label": "stop",
+      "score": 0.85,
+      "latency_ms": 238.64
+    },
+    {
+      "mode": "sd_jev",
+      "kind": "backchannel",
+      "ok": true,
+      "label": "backchannel",
+      "score": 0.91,
+      "latency_ms": 194.23
+    },
+    {
+      "mode": "sd_jev",
+      "kind": "compression",
+      "ok": true,
+      "label": "retain",
+      "score": 0.91,
+      "latency_ms": 212.86
+    },
+    {
+      "mode": "sd_jev",
+      "kind": "route",
+      "ok": true,
+      "label": "execute",
+      "score": 0.99,
+      "latency_ms": 263.46
+    },
+    {
+      "mode": "sd_jev",
+      "kind": "support",
+      "ok": true,
+      "label": "unsupported",
+      "score": 0.84,
+      "latency_ms": 266.36
+    }
+  ]
+}

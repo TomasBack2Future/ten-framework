@@ -109,6 +109,25 @@
         <summary>Session settings <span>Small, safe adjustments</span></summary>
         <div class="settings">
           <label
+            >Decision provider
+            <select id="decision-mode">
+              <option value="jev" selected>Jev</option>
+              <option value="sd">SD (direct classification)</option>
+              <option value="sd_jev">SD → Jev (compress then classify)</option>
+            </select>
+          </label>
+          <label
+            >Decision profile
+            <select id="decision-profile">
+              <option value="tuned" selected>Tuned candidate</option>
+              <option value="baseline">Baseline</option>
+            </select>
+          </label>
+          <p>
+            Applies to the next session. Provider selection does not enable
+            optional features. Tuned profiles are experimental.
+          </p>
+          <label
             ><input type="checkbox" id="enable-stop" checked /> Stop
             decisions</label
           ><label
@@ -138,7 +157,7 @@
             ></textarea></label
           ><label
             ><input type="checkbox" id="enable-compression" /> Background memory
-            compression (Jev → Groq)</label
+            compression (decision provider → Groq)</label
           >
           <label
             >Compress after characters

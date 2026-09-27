@@ -265,3 +265,19 @@ class Router:
             "provider_model_selection": provider["model_selection"],
             "provider_compression": provider["compression"],
         }
+
+
+class RuntimeRouter:
+    """Session routing with the voice provider's mode, profile and total timeout.
+
+    Inject the session's DecisionProvider. The legacy Router above remains an
+    immutable-spec offline benchmark adapter, including its original policies.
+    No execution or task cancellation is performed by either adapter.
+    """
+
+    def __init__(self, decision_provider):
+        self.decision_provider = decision_provider
+
+    async def classify(self, sample):
+        """Apply the session's frozen mode/profile and independent gates."""
+        return await self.decision_provider.route(model_input(sample))

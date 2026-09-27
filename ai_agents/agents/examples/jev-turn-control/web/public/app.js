@@ -212,6 +212,8 @@ function openSocket() {
   socket.onerror = () => status("Connection interrupted");
 }
 const settingIds = [
+  "decision-mode",
+  "decision-profile",
   "enable-start",
   "enable-stop",
   "enable-backchannel",
@@ -239,6 +241,8 @@ $("connect").onclick = async () => {
     session = await api("/api/session", {
       ...debug.settings(),
       settings: {
+        "provider.name": $("decision-mode").value,
+        "provider.profile": $("decision-profile").value,
         "start.enabled": $("enable-start").checked,
         "stop.enabled": $("enable-stop").checked,
         "backchannel.enabled": $("enable-backchannel").checked,

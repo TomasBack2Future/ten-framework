@@ -15,3 +15,4 @@ tasks:
       - 'PYTHONPATH=.. python3 -m unittest discover -s tests -p test_adapter.py -v'
       - 'PYTHONPATH=.. python3 -m unittest discover -s tests -p test_review_lifecycle.py -v'
       - 'PYTHONPATH=.. python3 -m unittest discover -s tests -p test_evaluation.py -v'
+      - 'PYTHONPATH=.. python3 -m unittest discover -s tests -p test_runtime_routing.py -v'

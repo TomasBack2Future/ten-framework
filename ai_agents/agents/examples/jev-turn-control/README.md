@@ -80,3 +80,10 @@ a person heard. A 500ms missing-stop-ack timeout is explicitly unconfirmed.
 All added business logic was written against public TEN APIs; no commercial
 interceptor or conversational-agent implementation was copied. Repository and
 copied-template licenses remain applicable.
+
+## Decision modes
+
+Session settings support Jev (default), SD direct classification and SD → Jev.
+The tuned candidate includes instructions, criteria and per-provider thresholds;
+the original baseline remains selectable. See [DECISION_MODES.md](DECISION_MODES.md)
+for configuration, measured latency, executor boundaries and evaluation limits.
