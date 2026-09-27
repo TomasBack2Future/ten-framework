@@ -9,7 +9,8 @@ if ! test -x .venv/bin/python; then
     uv venv --python python3 --system-site-packages .venv
 fi
 uv pip install --link-mode=copy --python .venv/bin/python -r requirements-dev.txt \
-  -r ../../ten_packages/extension/websocket_server/requirements.txt \
+  "websockets==15.0.1" "pydantic>=2.0" \
+  "openai==1.109.1" "httpx==0.28.1" "aiohttp==3.12.15" \
   -r ../../ten_packages/extension/soniox_asr_python/requirements.txt \
   -r ../../ten_packages/extension/openai_llm2_python/requirements.txt \
   -r ../../ten_packages/extension/cartesia_tts/requirements.txt \
