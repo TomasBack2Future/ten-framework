@@ -9,7 +9,7 @@
   <body>
     <header>
       <a class="brand" href="/">Jev<span> / TEN</span></a
-      ><span class="eyebrow">TURN CONTROL LAB</span
+      ><span id="debug-header" class="eyebrow">TURN CONTROL LAB</span
       ><span id="mode" class="badge">Connecting…</span>
     </header>
     <main>
@@ -128,7 +128,63 @@
               rows="3"
               placeholder="Keep answers concise and leave room for the speaker."
             ></textarea></label
-          ><button id="apply">Save for next session</button>
+          ><label class="prompt"
+            >Voice assistant prompt override
+            <textarea
+              id="voice-prompt"
+              maxlength="2000"
+              rows="3"
+              placeholder="Default: concise voice replies, conversation memory, and accurate demo architecture."
+            ></textarea></label
+          ><label
+            ><input type="checkbox" id="enable-compression" /> Background memory
+            compression (Jev → Groq)</label
+          >
+          <label
+            >Compress after characters
+            <input
+              id="compression-chars"
+              type="number"
+              min="1000"
+              max="24000"
+              value="8000"
+          /></label>
+          <label
+            >Keep recent turns
+            <input
+              id="compression-turns"
+              type="number"
+              min="1"
+              max="12"
+              value="3"
+          /></label>
+          <label
+            >Compression timeout (ms)
+            <input
+              id="compression-timeout"
+              type="number"
+              min="1000"
+              max="30000"
+              value="10000"
+          /></label>
+          <label class="prompt"
+            >Compression decision prompt override
+            <textarea
+              id="compression-prompt"
+              maxlength="2000"
+              rows="2"
+            ></textarea>
+          </label>
+          <label class="prompt"
+            >Memory summary prompt override
+            <textarea id="summary-prompt" maxlength="2000" rows="2"></textarea>
+          </label>
+          <p>
+            Memory belongs to this call only. Compression is optional; failures
+            keep the original conversation. At the history limit, start a new
+            call.
+          </p>
+          <button id="apply">Save for next session</button>
         </div>
       </details>
       <details class="panel" open>

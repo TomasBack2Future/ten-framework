@@ -23,6 +23,7 @@ from ten_runtime import (
 from .config import Config
 from .engine import TurnEngine
 from .provider import DecisionProvider
+from .memory import summarize, voice_request
 
 
 class JevTurnControlExtension(AsyncExtension):
@@ -37,6 +38,7 @@ class JevTurnControlExtension(AsyncExtension):
         self.generation = None
         self.pump_lock = asyncio.Lock()
         self.asr_segment = 0
+        self.asr_final_end = -1
         self.audio_response = None
 
     def now(self):
@@ -71,6 +73,9 @@ class JevTurnControlExtension(AsyncExtension):
             request = self.engine.begin_decision(self.now())
             if request:
                 self.spawn(self.classify(request))
+            compression = self.engine.begin_compression(self.now())
+            if compression:
+                self.spawn(self.compress(compression))
             await self.pump()
             await asyncio.sleep(0.02)
 
@@ -87,6 +92,52 @@ class JevTurnControlExtension(AsyncExtension):
         ):
             self.engine.complete_decision(request, {}, self.now(), error=True)
         await self.pump()
+
+    async def compress(self, request):
+        try:
+            await asyncio.wait_for(
+                self.compress_work(request),
+                self.engine.config["compression"]["timeout_ms"] / 1000,
+            )
+        except (
+            aiohttp.ClientError,
+            asyncio.TimeoutError,
+            ValueError,
+            KeyError,
+            TypeError,
+        ):
+            self.engine.complete_compression(
+                request, error="provider_or_timeout"
+            )
+        await self.pump()
+
+    async def compress_work(self, request):
+        answers = await self.provider.decide(request)
+        answer = answers["compression"]
+        self.engine.emit("context.decision", {"phase": "completed", **answer})
+        if not self.engine.compression_current(request):
+            self.engine.complete_compression(request)
+            return
+        if (
+            answer["label"] != "compress"
+            or answer["score"] < self.engine.config["compression"]["threshold"]
+        ):
+            self.engine.complete_compression(request)
+            return
+        self.engine.emit(
+            "context.summary", {"phase": "started", "provider": "groq"}
+        )
+        await self.pump()
+        if self.engine.config["provider"]["name"] == "mock":
+            summary = (
+                "Synthetic memory: "
+                + " ".join(item["text"][:80] for item in request["source"])[
+                    :500
+                ]
+            )
+        else:
+            summary = await summarize(request, self.engine.config)
+        self.engine.complete_compression(request, summary=summary)
 
     async def send_data(self, name, payload, destination):
         data = Data.create(name)
@@ -139,6 +190,7 @@ class JevTurnControlExtension(AsyncExtension):
                             break
                         await self.mock_audio(rid)
                         await asyncio.sleep(0.04)
+                self.engine.audio(rid, completed=True)
                 self.engine.emit(
                     "response.audio_completed", {"synthetic": True}, rid
                 )
@@ -150,7 +202,33 @@ class JevTurnControlExtension(AsyncExtension):
                 )
                 await self.tts(rid, action["phrase"], True)
                 return
-            await self.generate_live(action)
+            for attempt in range(2):
+                try:
+                    await self.generate_live(action)
+                    return
+                except Exception:
+                    if rid != self.engine.active:
+                        return
+                    self.engine.emit(
+                        "generation.failed",
+                        {"attempt": attempt + 1, "code": "llm_request_failed"},
+                        rid,
+                    )
+                    if self.engine.responses[rid]["text"]:
+                        raise
+                    if attempt == 0:
+                        self.engine.emit(
+                            "generation.retry",
+                            {"attempt": 2, "tools_enabled": False},
+                            rid,
+                        )
+                        continue
+            text = "Sorry, I could not generate that reply. Please try again."
+            self.engine.output(rid, text, self.now(), final=True)
+            self.engine.emit(
+                "generation.fallback", {"audible_if_tts_available": True}, rid
+            )
+            await self.tts(rid, text, True)
         except (
             Exception
         ):  # Vendor failures must not leak credentials or payloads.
@@ -170,30 +248,22 @@ class JevTurnControlExtension(AsyncExtension):
         )
 
         rid = action["response_id"]
-        system = "You are a concise helpful voice assistant. Use only supplied heard conversation context."
-        if action["mode"] == "clarify":
-            system += " Ask one short clarification; do not pretend the user has finished."
-        messages = [{"role": "system", "content": system}]
-        messages += [
-            {"role": item["role"], "content": item["text"]}
-            for item in action["context"]
-            if item["text"]
-        ]
-        messages.append({"role": "user", "content": action["input_text"]})
+        request = voice_request(action, self.engine.config)
+        self.engine.emit(
+            "context.request",
+            {
+                "context_revision": action["context_revision"],
+                "history_messages": len(request["messages"]) - 1,
+                "history_characters": sum(
+                    len(m["content"]) for m in request["messages"][:-1]
+                ),
+                "summary_characters": len(action.get("summary", "")),
+            },
+            rid,
+        )
         command = Cmd.create("chat_completion")
         command.set_dests([Loc("", "", "llm")])
-        command.set_property_from_json(
-            None,
-            json.dumps(
-                {
-                    "request_id": rid,
-                    "messages": messages,
-                    "streaming": True,
-                    "parameters": {"temperature": 0.4},
-                    "tools": [],
-                }
-            ),
-        )
+        command.set_property_from_json(None, json.dumps(request))
         fragment = ""
         async for result, error in self.ten_env.send_cmd_ex(command):
             if rid != self.engine.active:
@@ -260,6 +330,7 @@ class JevTurnControlExtension(AsyncExtension):
             "metadata", json.dumps({"response_id": rid, "synthetic": True})
         )
         frame.set_dests([Loc("", "", "websocket_server")])
+        self.engine.audio(rid, 40)
         await self.ten_env.send_audio_frame(frame)
 
     async def on_audio_frame(self, ten_env: AsyncTenEnv, frame: AudioFrame):
@@ -269,6 +340,11 @@ class JevTurnControlExtension(AsyncExtension):
         rid = meta.get("response_id") or request_id
         if not rid or rid != self.engine.active:
             return
+        self.engine.audio(
+            rid,
+            frame.get_samples_per_channel() / frame.get_sample_rate() * 1000,
+            timestamp=frame.get_timestamp(),
+        )
         meta["response_id"] = rid
         frame.set_property_from_json("metadata", json.dumps(meta))
         frame.set_dests([Loc("", "", "websocket_server")])
@@ -300,6 +376,18 @@ class JevTurnControlExtension(AsyncExtension):
             )
             if not isinstance(text, str) or not isinstance(final, bool):
                 raise ValueError("invalid ASR")
+            if name == "asr_result":
+                start_ms, duration_ms = payload.get("start_ms"), payload.get(
+                    "duration_ms"
+                )
+                if isinstance(start_ms, (int, float)) and isinstance(
+                    duration_ms, (int, float)
+                ):
+                    end_ms = start_ms + duration_ms
+                    if end_ms <= self.asr_final_end:
+                        return
+                    if final:
+                        self.asr_final_end = end_ms
             segment = payload.get("segment_id", f"asr-{self.asr_segment}")
             self.engine.input(text, final, now, segment)
             if name == "asr_result" and final:
@@ -344,6 +432,7 @@ class JevTurnControlExtension(AsyncExtension):
         elif name == "tts_audio_end":
             rid = payload.get("request_id")
             if rid == self.engine.active:
+                self.engine.audio(rid, completed=True)
                 self.engine.emit(
                     "response.audio_completed", {"synthetic": False}, rid
                 )
@@ -351,7 +440,7 @@ class JevTurnControlExtension(AsyncExtension):
             rid = payload.get("request_id")
             words = [
                 {
-                    "text": w.get("word", "") + " ",
+                    "text": w.get("word", ""),
                     "end_ms": w.get("start_ms", 0) + w.get("duration_ms", 0),
                 }
                 for w in payload.get("words", [])
@@ -381,7 +470,16 @@ class JevTurnControlExtension(AsyncExtension):
 
     async def on_stop(self, ten_env: AsyncTenEnv):
         if self.engine:
+            rid = self.engine.active or self.engine.stopping
             self.engine.close(self.now())
+            if self.generation:
+                self.generation.cancel()
+            if rid and self.engine.config["provider"]["name"] != "mock":
+                try:
+                    await asyncio.wait_for(self.abort(rid), 1)
+                except Exception:
+                    ten_env.log_info("JEV_SHUTDOWN_ABORT_UNAVAILABLE")
+            self.engine.drain_actions()
         for task in list(self.tasks):
             task.cancel()
         await asyncio.gather(*list(self.tasks), return_exceptions=True)

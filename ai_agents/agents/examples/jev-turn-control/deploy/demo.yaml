@@ -23,6 +23,9 @@ spec:
         - {name: JEV_MODE, value: mock}
         - {name: JEV_PUBLIC_ORIGIN, value: 'https://jev-demo.hipaa-poc.agoralab.co'}
         - {name: JEV_SESSION_SECONDS, value: '300'}
+        # Kong overwrites X-Real-IP with $remote_addr (verified on this ingress).
+        - {name: JEV_TRUST_PROXY, value: '1'}
+        - {name: JEV_EVENT_LOG_DIR, value: /tmp/jev-observations}
         - name: JEV_ACCESS_CODE
           valueFrom: {secretKeyRef: {name: jev-demo-access, key: JEV_ACCESS_CODE}}
         resources:

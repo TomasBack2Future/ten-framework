@@ -73,3 +73,37 @@ Keep Certbot account, work, and private-key files outside Git. Update only
 kubectl -n ten-jev-demo apply -f -`. Verify with normal certificate validation;
 never use `curl -k` as an acceptance check. Scale the challenge deployment to
 zero when finished; retain the route for the next renewal.
+
+## Debug sessions and observations
+
+After authenticating, click **TURN CONTROL LAB** 10 times, with no gap over two
+seconds, to disable the session expiry for this page. If connected, the server
+clears the active expiry timer; if disconnected, the next call carries the debug
+flag. Reloading resets the gesture. Authentication, single visitor, size/rate and
+playback backpressure limits remain. Normal calls still expire after five minutes.
+
+The runtime writes bounded JSONL observations to `JEV_EVENT_LOG_DIR` (default
+`/tmp/jev-observations`): up to 10 session files, 2 MiB each, mode 0600. Records carry
+build revision/session/response IDs and ASR/decision/timer/generation-error/playback/
+alignment events. Text is redacted by default; set `JEV_EVENT_LOG_TEXT=1` only for
+an authorized transcript investigation. Credentials are always redacted. No audio
+is recorded. Files survive graph process exits, but are **not durable across Pod
+replacement**: export needed evidence before rollout. No HTTP log-download endpoint
+is exposed. A storage/backpressure cap emits `observation.limit` instead of growing
+unbounded. Export through authorized namespace-scoped `kubectl exec`/`cp` only.
+
+`JEV_TRUST_PROXY=1` uses validated `X-Real-IP` for failed-login limits. Enable only
+behind an ingress that overwrites this header. The dedicated khipaa Kong config was
+verified to set `X-Real-IP $remote_addr`; the manifest opts in. Direct local runs
+ignore forwarded headers. Successful logins do not consume the failure allowance.
+
+The gateway sends `ready` only after the TEN WebSocket is connected. The microphone
+stays disabled during warmup; early control messages are bounded/queued and early
+PCM gets an explicit error. Disconnect sends stop and the last known cursor before
+closing upstream. The browser also resends its final stopped cursor after reconnect,
+and the engine can repair a timed-out old response without changing the new one.
+
+Every image build downloads and SHA256-checks the pinned runtime package before
+`tman install` uses that verified cache. Publication is not deployment. Review and
+merge all scoped PRs, build the merged release SHA, pin the image digest, then deploy
+once after release approval. Existing demo stays unchanged during this process.

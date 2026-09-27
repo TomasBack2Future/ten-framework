@@ -70,9 +70,7 @@ class OpenAIChatGPT:
     def __init__(self, ten_env: AsyncTenEnv, config: OpenAILLM2Config):
         self.config = config
         self.ten_env = ten_env
-        ten_env.log_info(
-            f"OpenAIChatGPT initialized with config: {config.api_key}"
-        )
+        ten_env.log_info("OpenAIChatGPT initialized")
         self.http_client = None
         if config.proxy_url:
             ten_env.log_info(f"Setting httpx proxy: {config.proxy_url}")

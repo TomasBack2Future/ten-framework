@@ -1,5 +1,8 @@
 import { EventStore } from "./state.js";
 import { Player, Recorder } from "./audio.js";
+import { DebugUnlock } from "./debug.js";
+const debug = new DebugUnlock();
+const pendingPlayback = new Map();
 const $ = (id) => document.getElementById(id);
 const store = new EventStore();
 const taskCards = new Map();
@@ -10,8 +13,11 @@ let socket,
   reconnectTimer,
   closing = false;
 const send = (data) => {
-  if (socket?.readyState === WebSocket.OPEN && socket.bufferedAmount < 65536)
+  if (socket?.readyState === WebSocket.OPEN && socket.bufferedAmount < 65536) {
     socket.send(JSON.stringify(data));
+    return true;
+  }
+  return false;
 };
 const control = (data) => send({ type: "data", name: "jev_control", data });
 const player = new Player((data) => {
@@ -19,7 +25,11 @@ const player = new Player((data) => {
     control({ action: "stop" });
     fail("Playback buffer limit reached; output stopped.");
   }
-  send({ type: "data", name: "jev_playback", data });
+  if (!send({ type: "data", name: "jev_playback", data }) && data.stopped) {
+    pendingPlayback.set(data.response_id, data);
+    if (pendingPlayback.size > 16)
+      pendingPlayback.delete(pendingPlayback.keys().next().value);
+  }
 });
 const recorder = new Recorder();
 const fail = (error) => {
@@ -135,6 +145,12 @@ function apply(e) {
     player.begin(e.response_id);
     status("Responding");
   }
+  if (e.type === "context.capacity")
+    fail(
+      new Error(
+        "Conversation memory is full. End this call and start a new one.",
+      ),
+    );
   if (e.type === "response.audio_completed")
     player.audioComplete(e.response_id);
   if (e.type === "response.cancelled") {
@@ -151,17 +167,24 @@ function openSocket() {
     `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws`,
   );
   socket.onopen = () => {
-    status(`${config.mode} · connected`);
-    control({ action: "snapshot" });
-    $("orb").classList.add("active");
-    for (const id of ["stop", "end", "replay", "send-text"])
-      $(id).disabled = false;
-    $("mic").disabled = config.mode !== "live";
+    status("Starting voice graph…");
+    $("end").disabled = false;
+    $("mic").disabled = true;
   };
   socket.onmessage = ({ data }) => {
     try {
       const m = JSON.parse(data);
-      if (m.type === "data" && m.name === "jev_event") apply(m.data);
+      if (m.type === "ready") {
+        for (const data of pendingPlayback.values())
+          send({ type: "data", name: "jev_playback", data });
+        pendingPlayback.clear();
+        control({ action: "snapshot" });
+        status(`${config.mode} · connected`);
+        $("orb").classList.add("active");
+        for (const id of ["stop", "end", "replay", "send-text"])
+          $(id).disabled = false;
+        $("mic").disabled = config.mode !== "live";
+      } else if (m.type === "data" && m.name === "jev_event") apply(m.data);
       else if (m.type === "audio") player.play(m);
       else if (m.type === "error") fail(m.error);
       else if (
@@ -178,6 +201,7 @@ function openSocket() {
     player.stop();
     recorder.stop();
     recording = false;
+    $("mic").disabled = true;
     $("mic").textContent = "Microphone off";
     $("orb").classList.remove("active");
     if (!closing) {
@@ -189,19 +213,35 @@ function openSocket() {
 }
 $("connect").onclick = async () => {
   try {
+    $("connect").disabled = true;
     await player.unlock();
     session = await api("/api/session", {
+      ...debug.settings(),
       settings: {
         "start.enabled": $("enable-start").checked,
         "stop.enabled": $("enable-stop").checked,
         "backchannel.enabled": $("enable-backchannel").checked,
         "start.prompt": $("prompt").value,
+        "voice.prompt": $("voice-prompt").value,
+        "compression.enabled": $("enable-compression").checked,
+        "compression.trigger_chars": Number($("compression-chars").value),
+        "compression.keep_turns": Number($("compression-turns").value),
+        "compression.timeout_ms": Number($("compression-timeout").value),
+        "compression.prompt": $("compression-prompt").value,
+        "compression.summary_prompt": $("summary-prompt").value,
       },
     });
     for (const id of [
       "enable-start",
       "enable-stop",
       "enable-backchannel",
+      "voice-prompt",
+      "enable-compression",
+      "compression-chars",
+      "compression-turns",
+      "compression-timeout",
+      "compression-prompt",
+      "summary-prompt",
       "prompt",
       "apply",
     ])
@@ -231,6 +271,13 @@ $("end").onclick = async () => {
     "enable-start",
     "enable-stop",
     "enable-backchannel",
+    "voice-prompt",
+    "enable-compression",
+    "compression-chars",
+    "compression-turns",
+    "compression-timeout",
+    "compression-prompt",
+    "summary-prompt",
     "prompt",
     "apply",
   ])
@@ -297,13 +344,29 @@ $("show-text").onchange = () => {
   for (const e of store.events) renderEvent(e);
 };
 setInterval(() => {
-  if (session) {
+  if (debug.enabled && (!session || session.expires_at === null)) {
+    $("clock").textContent = "Debug mode · no time limit";
+  } else if (session) {
     const n = Math.max(0, Math.ceil((session.expires_at - Date.now()) / 1000));
     $("clock").textContent =
       `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")} remaining`;
     if (!n) $("end").click();
   }
 }, 1000);
+$("debug-header").onclick = async () => {
+  if (!debug.click(performance.now())) return;
+  try {
+    if (session) {
+      const result = await api("/api/debug-unlock", {});
+      session.expires_at = result.expires_at;
+    }
+    $("clock").textContent = "Debug mode · no time limit";
+  } catch (err) {
+    debug.enabled = false;
+    debug.count = 0;
+    fail(err);
+  }
+};
 fetch("/api/config")
   .then((r) => r.json())
   .then((c) => {

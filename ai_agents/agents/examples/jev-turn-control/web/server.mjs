@@ -1,4 +1,6 @@
 import http from "node:http";
+import { isIP } from "node:net";
+import { observer } from "./observations.mjs";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -41,7 +43,7 @@ async function body(req) {
   let value = "";
   for await (const chunk of req) {
     value += chunk;
-    if (value.length > 8192) throw Error("Body too large");
+    if (value.length > 16384) throw Error("Body too large");
   }
   return JSON.parse(value || "{}");
 }
@@ -49,21 +51,25 @@ function stop() {
   const old = session;
   if (!old) return;
   session = null;
+  old.log?.write({ type: "session.ended" });
+  old.log?.close();
   clearTimeout(old.expiry);
   clearTimeout(old.grace);
   old.client?.close(1000, "Session ended");
   old.upstream?.close();
   if (
-    old.worker &&
+    old.worker?.pid &&
     old.worker.exitCode === null &&
     old.worker.signalCode === null
   ) {
     stopping = true;
-    old.worker.once("exit", () => {
+    const killTimer = setTimeout(() => old.worker.kill("SIGKILL"), 2000);
+    killTimer.unref();
+    old.worker.once("close", () => {
+      clearTimeout(killTimer);
       stopping = false;
     });
     old.worker.kill("SIGTERM");
-    setTimeout(() => old.worker.kill("SIGKILL"), 2000).unref();
   }
   for (const timer of old.timers) clearTimeout(timer);
 }
@@ -80,6 +86,7 @@ function emit(s, event) {
     response_id: event.response_id || null,
     payload: event.payload || {},
   };
+  s.log?.write(e);
   s.events.push(e);
   if (s.events.length > 300) s.events.shift();
   if (s.client?.readyState === 1)
@@ -202,7 +209,14 @@ const server = http.createServer(async (req, res) => {
       if (req.headers.origin && req.headers.origin !== origin)
         return json(res, 403, { error: "Origin rejected" });
       if (req.url === "/api/login") {
-        const ip = req.socket.remoteAddress;
+        // Enable only behind an ingress that overwrites X-Real-IP.
+        const forwarded = req.headers["x-real-ip"];
+        const ip =
+          process.env.JEV_TRUST_PROXY === "1" &&
+          typeof forwarded === "string" &&
+          isIP(forwarded)
+            ? forwarded
+            : req.socket.remoteAddress;
         const now = Date.now();
         if (attempts.size > 1000) attempts.clear();
         const a = attempts.get(ip) || { count: 0, until: now + 60000 };
@@ -211,17 +225,19 @@ const server = http.createServer(async (req, res) => {
           a.until = now + 60000;
         }
         attempts.set(ip, a);
-        if (++a.count > 10)
-          return json(res, 429, { error: "Try again in one minute" });
         const d = await body(req);
+        if (a.count >= 10)
+          return json(res, 429, { error: "Try again in one minute" });
         const candidate = Buffer.from(String(d.code || "")),
           expected = Buffer.from(code);
         if (
           !code ||
           candidate.length !== expected.length ||
           !timingSafeEqual(candidate, expected)
-        )
+        ) {
+          a.count++;
           return json(res, 401, { error: "Invalid access code" });
+        }
         for (const [key, end] of auth) if (end < now) auth.delete(key);
         if (auth.size >= 100)
           return json(res, 429, { error: "Too many active logins" });
@@ -243,14 +259,41 @@ const server = http.createServer(async (req, res) => {
         stop();
         return json(res, 200, { ok: true });
       }
+      if (req.url === "/api/debug-unlock") {
+        if (session && session.owner !== cookie(req))
+          return json(res, 403, {
+            error: "Session belongs to another visitor",
+          });
+        if (session) {
+          clearTimeout(session.expiry);
+          session.expiry = null;
+          session.expires_at = null;
+        }
+        return json(res, 200, { unlimited: true, expires_at: null });
+      }
       if (req.url === "/api/session") {
         if (session || stopping)
           return json(res, 409, {
             error: "The demo is busy. One private session at a time.",
           });
         const request = await body(req);
+        // Recheck after the body await: concurrent POSTs must not spawn two graphs.
+        if (session || stopping)
+          return json(res, 409, { error: "The demo is busy" });
+        if (
+          request.unlimited !== undefined &&
+          typeof request.unlimited !== "boolean"
+        )
+          return json(res, 400, { error: "Invalid debug setting" });
         const settings = request.settings || {};
         const keys = [
+          "voice.prompt",
+          "compression.enabled",
+          "compression.prompt",
+          "compression.summary_prompt",
+          "compression.trigger_chars",
+          "compression.keep_turns",
+          "compression.timeout_ms",
           "turn.enabled",
           "start.enabled",
           "stop.enabled",
@@ -259,12 +302,19 @@ const server = http.createServer(async (req, res) => {
           "stop.prompt",
           "backchannel.prompt",
         ];
+        const limits = {
+          "compression.trigger_chars": [1000, 24000],
+          "compression.keep_turns": [1, 12],
+          "compression.timeout_ms": [1000, 30000],
+        };
         for (const [k, v] of Object.entries(settings)) {
           if (
             !keys.includes(k) ||
             (k.endsWith(".enabled")
               ? typeof v !== "boolean"
-              : typeof v !== "string" || v.length > 2000)
+              : limits[k]
+                ? !Number.isInteger(v) || v < limits[k][0] || v > limits[k][1]
+                : typeof v !== "string" || v.length > 2000)
           )
             return json(res, 400, { error: "Invalid session setting" });
         }
@@ -272,15 +322,24 @@ const server = http.createServer(async (req, res) => {
           id: randomBytes(16).toString("hex"),
           owner: cookie(req),
           started: performance.now(),
-          expires_at: Date.now() + ttl,
+          expires_at: request.unlimited ? null : Date.now() + ttl,
           seq: 0,
           input_revision: 0,
           events: [],
           timers: [],
           fixtures: [],
         };
+        s.log = observer(s.id, revision);
+        s.log.write({
+          type: "session.started",
+          mode,
+          unlimited: !!request.unlimited,
+        });
         session = s;
-        s.expiry = setTimeout(stop, ttl);
+        if (!request.unlimited)
+          s.expiry = setTimeout(() => {
+            if (session === s) stop();
+          }, ttl);
         if (process.env.JEV_GRAPH_COMMAND) {
           s.worker = spawn(
             "bash",
@@ -331,6 +390,7 @@ const server = http.createServer(async (req, res) => {
       "/state.js": "state.js",
       "/audio.js": "audio.js",
       "/capture.js": "capture.js",
+      "/debug.js": "debug.js",
       "/style.css": "style.css",
     };
     const f = files[req.url];
@@ -376,25 +436,43 @@ wss.on("connection", (client) => {
   let count = 0;
   const rate = setInterval(() => (count = 0), 1000);
   let connecting = false;
+  const pending = [];
+  if (!s.worker) client.send(JSON.stringify({ type: "ready" }));
   async function upstream() {
     if (!s.worker || session !== s) return;
     connecting = true;
     for (let i = 0; i < 60 && session === s && client.readyState === 1; i++) {
       try {
-        const ws = new WebSocket("ws://127.0.0.1:8765", { maxPayload: 262144 });
+        const ws = new WebSocket(
+          process.env.JEV_GRAPH_WS_URL || "ws://127.0.0.1:8765",
+          { maxPayload: 262144 },
+        );
         await new Promise((resolve, reject) => {
           ws.once("open", resolve);
           ws.once("error", reject);
         });
+        if (session !== s || client.readyState !== 1) {
+          ws.close();
+          return;
+        }
         s.upstream = ws;
         connecting = false;
         ws.on("message", (data) => {
-          if (client.readyState === 1 && client.bufferedAmount < 524288)
+          try {
+            const message = JSON.parse(data.toString());
+            if (message.name === "jev_event") s.log.write(message.data);
+          } catch {
+            /* Invalid transport data is not recorded. */
+          }
+          if (client.readyState === 1 && client.bufferedAmount < 65536)
             client.send(data.toString());
           else client.close(1013, "Playback client too slow");
         });
         ws.on("error", () => client.close(1011, "Graph connection lost"));
         ws.on("close", () => client.close(1011, "Graph disconnected"));
+        client.send(JSON.stringify({ type: "ready" }));
+        for (const message of pending) ws.send(JSON.stringify(message));
+        pending.length = 0;
         ws.send(
           JSON.stringify({
             type: "data",
@@ -415,6 +493,14 @@ wss.on("connection", (client) => {
       if (++count > 100) throw Error();
       const m = JSON.parse(raw);
       if (!valid(m)) throw Error();
+      if (m.name === "jev_playback") {
+        s.lastPlayback = m.data;
+        s.log?.write({
+          type: "client.playback",
+          response_id: m.data.response_id,
+          payload: m.data,
+        });
+      }
       if (mode !== "live" && m.audio) return;
       if (
         mode === "live" &&
@@ -456,7 +542,16 @@ wss.on("connection", (client) => {
         if (s.upstream?.readyState === 1) {
           if (s.upstream.bufferedAmount > 65536) throw Error();
           s.upstream.send(JSON.stringify(m));
-        } else if (!connecting) throw Error();
+        } else if (connecting && !m.audio && pending.length < 16) {
+          pending.push(m);
+        } else if (connecting && m.audio) {
+          client.send(
+            JSON.stringify({
+              type: "error",
+              error: "Graph is warming up. Wait before enabling microphone.",
+            }),
+          );
+        } else throw Error();
       } else mock(s, m);
     } catch {
       client.close(1008, "Invalid or excessive messages");
@@ -464,8 +559,28 @@ wss.on("connection", (client) => {
   });
   client.on("close", () => {
     clearInterval(rate);
+    if (s.upstream?.readyState === 1) {
+      s.upstream.send(
+        JSON.stringify({
+          type: "data",
+          name: "jev_control",
+          data: { action: "stop" },
+        }),
+      );
+      if (s.lastPlayback)
+        s.upstream.send(
+          JSON.stringify({
+            type: "data",
+            name: "jev_playback",
+            data: { ...s.lastPlayback, stopped: true, completed: false },
+          }),
+        );
+    }
     s.upstream?.close();
-    if (session === s) s.grace = setTimeout(stop, 10000);
+    if (session === s)
+      s.grace = setTimeout(() => {
+        if (session === s) stop();
+      }, 10000);
   });
   client.on("error", () => {});
 });

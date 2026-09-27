@@ -11,7 +11,7 @@ COPY ai_agents/agents/ten_packages/extension/openai_llm2_python/ ai_agents/agent
 COPY ai_agents/agents/ten_packages/extension/cartesia_tts/ ai_agents/agents/ten_packages/extension/cartesia_tts/
 ENV TMAN=/opt/ten_manager/bin/tman
 WORKDIR /workspace/ai_agents/agents/examples/jev-turn-control
-RUN uv venv --python python3 .venv && task install \
+RUN bash scripts/cache-runtime.sh && uv venv --python python3 .venv && task install \
     && uv pip install --python .venv/bin/python 'aiohttp==3.12.15' 'websockets==15.0.1' \
     && cd web && npm ci --omit=dev --ignore-scripts
 FROM node:22.21.1-bookworm-slim AS node
@@ -24,6 +24,7 @@ WORKDIR /workspace/ai_agents/agents/examples/jev-turn-control
 ARG REVISION=development
 ENV JEV_REVISION=$REVISION NODE_ENV=production PORT=3000 JEV_MODE=mock
 ENV JEV_GRAPH_COMMAND=".venv/bin/python scripts/run_graph.py"
+ENV JEV_EVENT_LOG_DIR=/tmp/jev-observations
 ENV TEN_PYTHON_LIB_PATH=/usr/local/lib/libpython3.10.so
 USER 1000:1000
 EXPOSE 3000

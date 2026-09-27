@@ -77,8 +77,13 @@ test("gateway enforces auth, origin, settings, single session, snapshot and clea
   const ws = new WebSocket(`ws://localhost:${port}/ws`, {
     headers: { Origin: origin, Cookie: cookie },
   });
+  const next = new Promise((resolve) =>
+    ws.on("message", (message) => {
+      if (JSON.parse(message).data?.type === "state.snapshot")
+        resolve([message]);
+    }),
+  );
   await once(ws, "open");
-  const next = once(ws, "message");
   ws.send(
     JSON.stringify({
       type: "data",

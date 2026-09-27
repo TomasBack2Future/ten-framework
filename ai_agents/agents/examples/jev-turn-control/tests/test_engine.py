@@ -287,7 +287,7 @@ def test_finished_context_is_bounded():
         engine.output(rid, "hello", engine.now)
         engine.playback(rid, 500, engine.now + 500, completed=True)
     assert len(engine.finished) == 2
-    assert len(engine.history) == 2
+    assert len(engine.history) == 10
     assert not engine.responses
 
 

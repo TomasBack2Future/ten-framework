@@ -9,6 +9,7 @@ import asyncio
 import base64
 import json
 import os
+from urllib.parse import urlsplit
 from pathlib import Path
 import time
 
@@ -19,6 +20,8 @@ async def validate(url, pcm_path, output_path):
     headers = {}
     if os.environ.get("JEV_GATEWAY_COOKIE"):
         headers["Cookie"] = os.environ["JEV_GATEWAY_COOKIE"]
+    parsed = urlsplit(url)
+    origin = os.environ.get("JEV_PUBLIC_ORIGIN") or ("https://" if parsed.scheme == "wss" else "http://") + parsed.netloc
     events = []
     audio_bytes = 0
     rid = None
@@ -26,8 +29,13 @@ async def validate(url, pcm_path, output_path):
     stop_sent = False
     started = time.monotonic()
     async with websockets.connect(
-        url, additional_headers=headers, open_timeout=15
+        url, additional_headers=headers, origin=origin, open_timeout=15
     ) as socket:
+        if headers:
+            while True:
+                ready = json.loads(await asyncio.wait_for(socket.recv(), 20))
+                if ready.get("type") == "ready":
+                    break
         audio = pcm_path.read_bytes() + bytes(32000)
 
         async def feed():
