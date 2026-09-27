@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test test/*.test.mjs",
-    "check": "node --check server.mjs && node --check observations.mjs && node --check public/debug.js && node --check public/app.js && node --check public/audio.js"
+    "check": "node --check server.mjs && node --check observations.mjs && node --check public/workflow.js && node --check public/app.js && node --check public/audio.js"
   },
   "dependencies": {
     "ws": "8.22.0"

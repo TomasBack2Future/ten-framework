@@ -13,6 +13,9 @@ export class Player {
     this.generationDone = false;
     this.timer = null;
     this.blocked = new Set();
+    this.muted = false;
+    this.heardLimit = null;
+    this.gain = null;
   }
   async unlock() {
     this.ctx ??= new this.Context();
@@ -35,6 +38,11 @@ export class Player {
     } finally {
       clearTimeout(deadline);
     }
+    if (!this.gain) {
+      this.gain = this.ctx.createGain();
+      this.gain.connect(this.ctx.destination);
+      this.gain.gain.value = this.muted ? 0 : 1;
+    }
     this.timer ??= setInterval(() => this.progress(false), 150);
   }
   begin(id) {
@@ -44,6 +52,8 @@ export class Player {
       this.response = id;
       this.generationDone = false;
       this.timeline = [];
+      this.heardLimit = this.muted ? 0 : null;
+      if (this.gain) this.gain.gain.value = this.muted ? 0 : 1;
       this.next = this.ctx?.currentTime || 0;
     }
   }
@@ -79,7 +89,7 @@ export class Player {
       samples[i] = view.getInt16(i * 2, true) / 32768;
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
-    source.connect(this.ctx.destination);
+    source.connect(this.gain);
     const id = this.response;
     this.timeline.push({ start, duration: buffer.duration });
     this.next = start + buffer.duration;
@@ -112,15 +122,16 @@ export class Player {
         const total = Math.round(
           this.timeline.reduce((n, x) => n + x.duration, 0) * 1000,
         );
-        if (this.cursor() < total) {
+        if (this.scheduledCursor() < total) {
           this.checkComplete();
           return;
         }
         this.report({
           response_id: id,
           played_ms: this.cursor(),
-          stopped: false,
-          completed: true,
+          stopped: this.heardLimit !== null,
+          completed: this.heardLimit === null,
+          ...(this.heardLimit !== null ? { reason: "muted" } : {}),
           accuracy: "estimated",
         });
         this.blocked.add(id);
@@ -141,7 +152,22 @@ export class Player {
     const seconds = this.ctx?.outputLatency || this.ctx?.baseLatency || 0;
     return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
   }
+  setMuted(value) {
+    this.muted = value;
+    if (value && this.response && this.heardLimit === null)
+      this.heardLimit = this.cursor();
+    // Once a prefix was muted, keep that reply silent: a single cursor cannot
+    // represent holes. Unmute takes effect at the next response boundary.
+    if (this.gain)
+      this.gain.gain.value =
+        value || (this.response && this.heardLimit !== null) ? 0 : 1;
+  }
   cursor() {
+    return this.heardLimit === null
+      ? this.scheduledCursor()
+      : Math.min(this.heardLimit, this.scheduledCursor());
+  }
+  scheduledCursor() {
     if (!this.ctx) return 0;
     // AudioContext time measures scheduling, not acoustic delivery. Label estimated.
     const now = this.ctx.currentTime - this.latency();
@@ -194,20 +220,24 @@ export class Player {
     this.stop();
     clearInterval(this.timer);
     this.timer = null;
-    await this.ctx?.close();
+    const ctx = this.ctx;
     this.ctx = null;
+    this.gain = null;
+    if (ctx && ctx.state !== "closed") await ctx.close();
   }
 }
 export class Recorder {
   async start(send) {
+    const generation = (this.generation = (this.generation || 0) + 1);
     if (!globalThis.isSecureContext)
       throw new Error("Microphone requires HTTPS or localhost.");
     this.ctx = new AudioContext({ sampleRate: 16000 });
     await this.ctx.resume();
+    if (generation !== this.generation) return false;
     try {
       if (this.ctx.sampleRate !== 16000)
         throw new Error("This browser cannot capture 16 kHz PCM.");
-      this.stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
           echoCancellation: true,
@@ -215,7 +245,13 @@ export class Recorder {
         },
         video: false,
       });
+      if (generation !== this.generation) {
+        stream.getTracks().forEach((t) => t.stop());
+        return false;
+      }
+      this.stream = stream;
       await this.ctx.audioWorklet.addModule("/capture.js");
+      if (generation !== this.generation) return false;
       this.source = this.ctx.createMediaStreamSource(this.stream);
       this.node = new AudioWorkletNode(this.ctx, "pcm-capture");
       this.node.port.onmessage = ({ data }) => {
@@ -229,16 +265,22 @@ export class Recorder {
       };
       this.source.connect(this.node);
       this.node.connect(this.ctx.destination);
+      return true;
     } catch (error) {
       await this.stop();
       throw error;
     }
   }
   async stop() {
+    this.generation = (this.generation || 0) + 1;
     this.node?.disconnect();
     this.source?.disconnect();
     this.stream?.getTracks().forEach((t) => t.stop());
-    await this.ctx?.close();
+    const ctx = this.ctx;
     this.ctx = null;
+    this.node = null;
+    this.source = null;
+    this.stream = null;
+    if (ctx && ctx.state !== "closed") await ctx.close();
   }
 }

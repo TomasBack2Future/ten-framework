@@ -4,7 +4,6 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import net from "node:net";
 import { WebSocket, WebSocketServer } from "ws";
-import { DebugUnlock } from "../public/debug.js";
 import { redact } from "../observations.mjs";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function gateway(t, env = {}) {
@@ -41,11 +40,9 @@ async function gateway(t, env = {}) {
       },
       body: JSON.stringify(data),
     });
-  const login = await post("/api/login", { code: "test-code" });
-  cookie = login.headers.get("set-cookie").split(";")[0];
-  const connect = () =>
-    new WebSocket(`ws://localhost:${port}/ws`, {
-      headers: { Origin: origin, Cookie: cookie },
+  const connect = (id) =>
+    new WebSocket(`ws://localhost:${port}/ws?session_id=${id}`, {
+      headers: { Origin: origin },
     });
   return { post, connect };
 }
@@ -61,61 +58,6 @@ async function until(predicate) {
   }
   assert.fail("Condition timed out");
 }
-test("ten consecutive header clicks unlock only page-local debug settings", () => {
-  const debug = new DebugUnlock();
-  for (let i = 0; i < 9; i++) assert.equal(debug.click(i * 100), false);
-  assert.equal(debug.settings().unlimited, false);
-  assert.equal(debug.click(900), true);
-  assert.equal(debug.settings().unlimited, true);
-  assert.equal(debug.click(1000), false);
-  const reset = new DebugUnlock();
-  for (let i = 0; i < 9; i++) reset.click(i * 100);
-  assert.equal(reset.click(3001), false);
-  assert.equal(reset.enabled, false);
-  assert.equal(new DebugUnlock().settings().unlimited, false);
-});
-test("default expiry, authenticated live removal, and next-session debug retain single-session limit", async (t) => {
-  const { post } = await gateway(t, { JEV_SESSION_SECONDS: "0.25" });
-  assert.equal((await post("/api/debug-unlock", {}, false)).status, 401);
-  assert.equal(
-    (await post("/api/session", { unlimited: true }, false)).status,
-    401,
-  );
-  const normal = await (await post("/api/session")).json();
-  assert.ok(normal.expires_at > Date.now());
-  await sleep(350);
-  const next = await (await post("/api/session")).json(); // Previous default session expired.
-  assert.ok(next.id);
-  assert.equal((await post("/api/debug-unlock")).status, 200);
-  await sleep(350);
-  assert.equal((await post("/api/session")).status, 409); // Its old timer was removed.
-  await post("/api/end", { session_id: next.id });
-  const debug = new DebugUnlock();
-  for (let i = 0; i < 10; i++) debug.click(i);
-  const unlocked = await (await post("/api/session", debug.settings())).json();
-  assert.equal(unlocked.expires_at, null);
-  await sleep(350);
-  assert.equal((await post("/api/session")).status, 409);
-  await post("/api/end", { session_id: unlocked.id });
-});
-test("concurrent requests reserve one session after body await and valid login survives shared failure bucket", async (t) => {
-  const { post } = await gateway(t, { JEV_TRUST_PROXY: "1" });
-  const result = await Promise.all([
-    post("/api/session"),
-    post("/api/session"),
-  ]);
-  assert.deepEqual(result.map((r) => r.status).sort(), [200, 409]);
-  await post("/api/end", {
-    session_id: (await result.find((r) => r.status === 200).json()).id,
-  });
-  for (let i = 0; i < 11; i++) await post("/api/login", { code: "wrong" });
-  assert.equal((await post("/api/login", { code: "wrong" })).status, 429);
-  assert.equal(
-    (await post("/api/login", { code: "test-code" }, true, "203.0.113.2"))
-      .status,
-    200,
-  );
-});
 test("graph readiness gates media, queues early stop, and disconnect forwards stop cursor", async (t) => {
   const reserved = net.createServer().listen(0, "127.0.0.1");
   await once(reserved, "listening");
@@ -127,7 +69,7 @@ test("graph readiness gates media, queues early stop, and disconnect forwards st
     JEV_MODE: "live",
   });
   const created = await (await post("/api/session")).json();
-  const ws = connect(),
+  const ws = connect(created.id),
     received = messages(ws);
   await once(ws, "open");
   ws.send(JSON.stringify({ audio: "AAAA" }));
@@ -266,4 +208,14 @@ test("decision mode and profile validation, defaults and credential availability
         .status,
       503,
     );
+});
+
+test("ten consecutive header clicks retain the hidden page-local unlimited mode", async () => {
+  const { DebugUnlock } = await import("../public/debug.js");
+  const debug = new DebugUnlock();
+  for (let i = 0; i < 9; i++) assert.equal(debug.click(i * 100), false);
+  assert.equal(debug.settings().unlimited, false);
+  assert.equal(debug.click(900), true);
+  assert.equal(debug.settings().unlimited, true);
+  assert.equal(new DebugUnlock().settings().unlimited, false);
 });

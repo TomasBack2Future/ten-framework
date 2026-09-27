@@ -7,6 +7,9 @@ class Context {
   outputLatency = 0.24;
   destination = {};
   nodes = [];
+  createGain() {
+    return { gain: { value: 1 }, connect() {} };
+  }
   async resume() {}
   async close() {}
   createBuffer(_channels, n, rate) {
@@ -117,4 +120,31 @@ test("late old onended cannot finish a newer response", async (t) => {
     reports.some((x) => x.response_id === "r2" && x.completed),
     false,
   );
+});
+
+test("speaker mute preserves only audible prefix; unmute starts at next reply", async (t) => {
+  const { p, reports } = await fixture(t);
+  p.ctx.outputLatency = 0;
+  p.play(frame("r1", 1000));
+  p.ctx.currentTime = 0.415;
+  p.setMuted(true);
+  assert.equal(p.gain.gain.value, 0);
+  assert.equal(p.cursor(), 400);
+  p.setMuted(false);
+  assert.equal(p.gain.gain.value, 0);
+  p.ctx.currentTime = 1.1;
+  p.audioComplete("r1");
+  p.ctx.nodes[0].onended();
+  await sleep(180);
+  const end = reports.find((x) => x.reason === "muted");
+  assert.equal(end.played_ms, 400);
+  assert.equal(end.completed, false);
+  assert.equal(end.stopped, true);
+  p.begin("r2");
+  assert.equal(p.gain.gain.value, 1);
+  assert.ok(p.play(frame("r2")));
+  p.setMuted(true);
+  p.begin("r3");
+  assert.equal(p.cursor(), 0);
+  assert.equal(p.gain.gain.value, 0);
 });

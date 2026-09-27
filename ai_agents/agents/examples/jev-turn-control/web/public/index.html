@@ -3,251 +3,381 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Jev · A conversation that listens</title>
+    <title>TEN / Jev · Turn Control Lab</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
     <header>
-      <a class="brand" href="/">Jev<span> / TEN</span></a
-      ><span id="debug-header" class="eyebrow">TURN CONTROL LAB</span
-      ><span id="mode" class="badge">Connecting…</span>
+      <a class="brand" href="/">TEN <span>/</span> Jev</a
+      ><span id="debug-header" class="eyebrow">TURN CONTROL LAB</span>
+      <div class="header-right">
+        <span id="mode" class="badge">READY</span><span id="clock">05:00</span
+        ><button
+          id="details-toggle"
+          aria-expanded="false"
+          aria-controls="details-drawer"
+        >
+          Details <span aria-hidden="true">⌄</span>
+        </button>
+      </div>
     </header>
     <main>
       <section class="intro">
-        <p class="eyebrow">ROOM TO THINK. SPACE TO SPEAK.</p>
-        <h1>A conversation<br />that <em>listens.</em></h1>
-        <p>
-          Keep your train of thought. Watch a voice agent decide when to wait,
-          speak, and stop.
+        <h1>See every turn take shape.</h1>
+        <p id="status" role="status">
+          Live input. Visible decisions. Spoken replies.
         </p>
       </section>
-      <section class="call">
-        <div class="call-heading">
-          <span id="status">Ready when you are</span
-          ><span id="clock">05:00 limit</span>
+      <section
+        id="workflow"
+        class="workflow"
+        aria-label="Live conversation workflow"
+      >
+        <div class="flow-grid">
+          <article id="node-input" class="flow-node" data-state="idle">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="2" width="6" height="12" rx="3" />
+              <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8" />
+            </svg>
+            <div><strong>You</strong><small>Microphone off</small></div>
+          </article>
+          <div id="edge-input" class="connector"></div>
+          <article id="node-asr" class="flow-node" data-state="idle">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 10v4m4-8v12m5-16v20m5-16v12m4-8v4" />
+            </svg>
+            <div><strong>Soniox</strong><small>Live transcription</small></div>
+          </article>
+          <div id="edge-asr" class="connector"></div>
+          <article
+            id="node-decision"
+            class="flow-node decision"
+            data-state="idle"
+          >
+            <div class="decision-title">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m6 4 13 8-13 8V4Z" />
+                <circle cx="6" cy="4" r="2" />
+                <circle cx="19" cy="12" r="2" />
+                <circle cx="6" cy="20" r="2" />
+              </svg>
+              <div>
+                <strong id="provider-name">Jev</strong
+                ><small>Turn decisions</small>
+              </div>
+            </div>
+            <div class="decision-row" id="decision-start" data-state="idle">
+              <span>Start reply</span><strong id="brain-start">—</strong
+              ><span id="detail-start" class="sr-only"></span>
+            </div>
+            <div class="decision-row" id="decision-stop" data-state="idle">
+              <span>Stop reply</span><strong id="brain-stop">—</strong
+              ><span id="detail-stop" class="sr-only"></span>
+            </div>
+            <div
+              class="decision-row"
+              id="decision-backchannel"
+              data-state="idle"
+            >
+              <span>Backchannel</span><strong id="brain-backchannel">OFF</strong
+              ><span id="detail-backchannel" class="sr-only"></span>
+            </div>
+          </article>
+          <div id="edge-decision" class="connector"></div>
+          <article id="node-llm" class="flow-node" data-state="idle">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="3" />
+              <path d="M7 8h10M7 12h10M7 16h6" />
+            </svg>
+            <div><strong>Groq</strong><small>Compose reply</small></div>
+          </article>
+          <div id="edge-llm" class="connector"></div>
+          <article id="node-tts" class="flow-node" data-state="idle">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 10v4m4-8v12m5-16v20m5-16v12m4-8v4" />
+            </svg>
+            <div><strong>Cartesia</strong><small>Generate speech</small></div>
+          </article>
+          <div id="edge-tts" class="connector"></div>
+          <article id="node-output" class="flow-node" data-state="idle">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m11 5-6 4H2v6h3l6 4z" />
+              <path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" />
+            </svg>
+            <div><strong>Playback</strong><small>Waiting for audio</small></div>
+          </article>
         </div>
-        <div class="orb" id="orb"><span>J</span></div>
-        <div id="subtitle" aria-live="polite">Connect to begin a session.</div>
-        <div class="controls">
-          <button id="connect" class="primary" disabled>Connect</button
-          ><button id="mic" disabled>Microphone off</button
-          ><button id="stop" disabled>Stop playback</button
-          ><button id="end" disabled>End call</button>
+        <div class="feedback">
+          <div id="interrupt-path" class="return-line interrupt">
+            <span>Interrupt</span>
+          </div>
+          <div id="playback-path" class="return-line playback">
+            <span>Playback progress</span>
+          </div>
         </div>
-        <p id="notice" role="status">
-          Mock sessions use scripted events. No real speech recognition or model
-          inference.
-        </p>
-        <form id="login" hidden>
-          <label
-            >Demo access code
-            <input
-              id="access"
-              type="password"
-              autocomplete="current-password"
-              required
-              maxlength="200" /></label
-          ><button>Unlock demo</button>
-        </form>
-        <div id="mock-tools">
+        <div class="workflow-footer">
+          <div class="legend">
+            <span><i class="passed"></i>Passed</span
+            ><span><i class="waiting"></i>Waiting</span
+            ><span><i></i>Not passed</span>
+          </div>
+          <span id="flow-status">Start a conversation to see the flow</span>
+        </div>
+      </section>
+      <section class="current-turn" aria-label="Current conversation">
+        <div class="utterance">
+          <div class="avatar">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="2" width="6" height="12" rx="3" />
+              <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8" />
+            </svg>
+          </div>
+          <div class="utterance-copy">
+            <h2>YOU</h2>
+            <p id="transcript">Your words will appear here.</p>
+          </div>
+          <span id="input-state" class="utterance-state">Ready</span>
+        </div>
+        <div class="utterance">
+          <div class="avatar assistant">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3z" />
+            </svg>
+          </div>
+          <div class="utterance-copy">
+            <h2>ASSISTANT</h2>
+            <p id="subtitle">
+              <span id="spoken"></span
+              ><span id="unspoken"
+                >A little room to think. A natural time to reply.</span
+              >
+            </p>
+          </div>
+          <span id="output-state" class="utterance-state">Ready</span>
+        </div>
+      </section>
+      <footer class="call-footer">
+        <div class="controls" aria-label="Call controls">
+          <button
+            id="connect"
+            class="icon-button primary"
+            aria-label="Start conversation"
+            title="Start conversation"
+            disabled
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m9 5 11 7-11 7z" />
+            </svg></button
+          ><button
+            id="speaker"
+            class="icon-button"
+            aria-label="Mute speaker"
+            title="Mute speaker"
+            disabled
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m11 5-6 4H2v6h3l6 4z" />
+              <path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /></svg
+            ><span class="slash" aria-hidden="true"></span></button
+          ><button
+            id="mic"
+            class="icon-button"
+            aria-label="Unmute microphone"
+            title="Unmute microphone"
+            disabled
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="2" width="6" height="12" rx="3" />
+              <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8" /></svg
+            ><span class="slash" aria-hidden="true"></span></button
+          ><button
+            id="end"
+            class="icon-button danger"
+            aria-label="End conversation"
+            title="End conversation"
+            disabled
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+          </button>
+        </div>
+        <p id="notice">5 minutes per session · no sign-in needed</p>
+        <p id="error" role="alert"></p>
+      </footer>
+    </main>
+    <dialog id="details-drawer" aria-labelledby="details-title">
+      <div class="drawer-heading">
+        <div>
+          <span class="eyebrow">TURN CONTROL LAB</span>
+          <h2 id="details-title">Session details</h2>
+        </div>
+        <button id="details-close" aria-label="Close details">✕</button>
+      </div>
+      <div class="drawer-content">
+        <details class="panel" open>
+          <summary>Conversation history</summary>
+          <div id="history"></div>
+          <h3>Playback estimate</h3>
+          <p id="heard">Nothing played yet.</p>
+          <small
+            >Playback time estimates do not prove acoustic delivery. Muted audio
+            is not counted as heard.</small
+          >
+        </details>
+        <details class="panel">
+          <summary>Prompts & configuration</summary>
+          <div class="settings">
+            <label
+              >Decision provider
+              <select id="decision-mode">
+                <option value="jev" selected>Jev</option>
+                <option value="sd">SD (direct classification)</option>
+                <option value="sd_jev">
+                  SD → Jev (compress then classify)
+                </option>
+              </select>
+            </label>
+            <label
+              >Decision profile
+              <select id="decision-profile">
+                <option value="tuned" selected>Tuned candidate</option>
+                <option value="baseline">Baseline</option>
+              </select>
+            </label>
+            <p>
+              Applies to the next session. Provider selection does not enable
+              optional features. Tuned profiles are experimental.
+            </p>
+            <label
+              ><input type="checkbox" id="enable-executor" disabled /><span
+                id="executor-availability"
+                >Codex artifacts (unavailable)</span
+              ></label
+            >
+            <label
+              ><input type="checkbox" id="enable-stop" checked /> Stop
+              decisions</label
+            ><label
+              ><input type="checkbox" id="enable-start" checked /> Start
+              decisions</label
+            ><label
+              ><input type="checkbox" id="enable-backchannel" />
+              Backchannel</label
+            ><label
+              ><input type="checkbox" id="show-text" checked /> Show transcript
+              text in observations</label
+            ><label class="prompt"
+              >Start decision prompt override
+              <textarea
+                id="prompt"
+                maxlength="2000"
+                rows="3"
+                placeholder="Keep answers concise and leave room for the speaker."
+              ></textarea></label
+            ><label class="prompt"
+              >Voice assistant prompt override
+              <textarea
+                id="voice-prompt"
+                maxlength="2000"
+                rows="3"
+                placeholder="Default: concise voice replies, conversation memory, and accurate demo architecture."
+              ></textarea></label
+            ><label
+              ><input type="checkbox" id="enable-compression" /> Background
+              memory compression (decision provider → Groq)</label
+            >
+            <label
+              >Compress after characters
+              <input
+                id="compression-chars"
+                type="number"
+                min="1000"
+                max="24000"
+                value="8000"
+            /></label>
+            <label
+              >Keep recent turns
+              <input
+                id="compression-turns"
+                type="number"
+                min="1"
+                max="12"
+                value="3"
+            /></label>
+            <label
+              >Compression timeout (ms)
+              <input
+                id="compression-timeout"
+                type="number"
+                min="1000"
+                max="30000"
+                value="10000"
+            /></label>
+            <label class="prompt"
+              >Compression decision prompt override
+              <textarea
+                id="compression-prompt"
+                maxlength="2000"
+                rows="2"
+              ></textarea>
+            </label>
+            <label class="prompt"
+              >Memory summary prompt override
+              <textarea
+                id="summary-prompt"
+                maxlength="2000"
+                rows="2"
+              ></textarea>
+            </label>
+            <p>
+              Memory belongs to this call only. Compression is optional;
+              failures keep the original conversation. At the history limit,
+              start a new call.
+            </p>
+            <button id="apply">Save for next session</button>
+          </div>
+        </details>
+        <details class="panel">
+          <summary>Event log</summary>
+          <div class="timeline-head">
+            <span id="revision">Input revision 0</span
+            ><button id="clear">Clear view</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Event</th>
+                  <th>Revision</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody id="events"></tbody>
+            </table>
+          </div>
+        </details>
+        <section id="mock-tools" class="panel" hidden>
+          <h3>Scripted preview</h3>
           <button id="replay" disabled>Replay interruption</button>
           <form id="text-form">
             <input
               id="text"
               maxlength="1000"
-              placeholder="Mock transcript — type, then send"
+              placeholder="Mock transcript"
               aria-label="Mock transcript"
             /><button id="send-text" disabled>Send</button>
           </form>
-        </div>
-      </section>
-      <section class="brains" aria-label="Decision roles">
-        <article>
-          <span class="dot stop"></span>
-          <h2>Stop</h2>
-          <p>Protect your turn</p>
-          <strong id="brain-stop">Listening</strong
-          ><small id="detail-stop">Higher priority than starting</small>
-        </article>
-        <article>
-          <span class="dot start"></span>
-          <h2>Start</h2>
-          <p>Answer at the right moment</p>
-          <strong id="brain-start">Waiting</strong
-          ><small id="detail-start">Final transcript ≠ end of turn</small>
-        </article>
-        <article>
-          <span class="dot backchannel"></span>
-          <h2>Backchannel</h2>
-          <p>A small acknowledgment</p>
-          <strong id="brain-backchannel">Off</strong
-          ><small id="detail-backchannel">Never interrupts an answer</small>
-        </article>
-      </section>
-      <details class="panel" open>
-        <summary>
-          Conversation <span>What was said · what was heard</span>
-        </summary>
-        <div class="conversation">
-          <div>
-            <h3>Live transcript</h3>
-            <div id="transcript" class="transcript">
-              Your words will appear here.
-            </div>
-          </div>
-          <div>
-            <h3>Heard context <span class="badge">Estimated playback</span></h3>
-            <p id="heard">Nothing played yet.</p>
-            <small
-              >Browser playback time is an estimate; it does not prove sound
-              reached the listener.</small
-            >
-          </div>
-        </div>
-      </details>
-      <details class="panel">
-        <summary>Session settings <span>Small, safe adjustments</span></summary>
-        <div class="settings">
-          <label
-            >Decision provider
-            <select id="decision-mode">
-              <option value="jev" selected>Jev</option>
-              <option value="sd">SD (direct classification)</option>
-              <option value="sd_jev">SD → Jev (compress then classify)</option>
-            </select>
-          </label>
-          <label
-            >Decision profile
-            <select id="decision-profile">
-              <option value="tuned" selected>Tuned candidate</option>
-              <option value="baseline">Baseline</option>
-            </select>
-          </label>
-          <p>
-            Applies to the next session. Provider selection does not enable
-            optional features. Tuned profiles are experimental.
-          </p>
-          <label
-            ><input type="checkbox" id="enable-executor" disabled /><span
-              id="executor-availability"
-              >Codex artifacts (unavailable)</span
-            ></label
-          >
-          <label
-            ><input type="checkbox" id="enable-stop" checked /> Stop
-            decisions</label
-          ><label
-            ><input type="checkbox" id="enable-start" checked /> Start
-            decisions</label
-          ><label
-            ><input type="checkbox" id="enable-backchannel" />
-            Backchannel</label
-          ><label
-            ><input type="checkbox" id="show-text" checked /> Show transcript
-            text in observations</label
-          ><label class="prompt"
-            >Start decision prompt override
-            <textarea
-              id="prompt"
-              maxlength="2000"
-              rows="3"
-              placeholder="Keep answers concise and leave room for the speaker."
-            ></textarea></label
-          ><label class="prompt"
-            >Voice assistant prompt override
-            <textarea
-              id="voice-prompt"
-              maxlength="2000"
-              rows="3"
-              placeholder="Default: concise voice replies, conversation memory, and accurate demo architecture."
-            ></textarea></label
-          ><label
-            ><input type="checkbox" id="enable-compression" /> Background memory
-            compression (decision provider → Groq)</label
-          >
-          <label
-            >Compress after characters
-            <input
-              id="compression-chars"
-              type="number"
-              min="1000"
-              max="24000"
-              value="8000"
-          /></label>
-          <label
-            >Keep recent turns
-            <input
-              id="compression-turns"
-              type="number"
-              min="1"
-              max="12"
-              value="3"
-          /></label>
-          <label
-            >Compression timeout (ms)
-            <input
-              id="compression-timeout"
-              type="number"
-              min="1000"
-              max="30000"
-              value="10000"
-          /></label>
-          <label class="prompt"
-            >Compression decision prompt override
-            <textarea
-              id="compression-prompt"
-              maxlength="2000"
-              rows="2"
-            ></textarea>
-          </label>
-          <label class="prompt"
-            >Memory summary prompt override
-            <textarea id="summary-prompt" maxlength="2000" rows="2"></textarea>
-          </label>
-          <p>
-            Memory belongs to this call only. Compression is optional; failures
-            keep the original conversation. At the history limit, start a new
-            call.
-          </p>
-          <button id="apply">Save for next session</button>
-        </div>
-      </details>
-      <details class="panel" open>
-        <summary>
-          Observation timeline
-          <span>Most recent 300 events · no hidden reasoning</span>
-        </summary>
-        <div class="timeline-head">
-          <span id="revision">Input revision 0</span
-          ><button id="clear">Clear view</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Event</th>
-                <th>Revision</th>
-                <th>Result / reason</th>
-              </tr>
-            </thead>
-            <tbody id="events"></tbody>
-          </table>
-        </div>
-      </details>
-      <section class="panel" id="tasks-panel" hidden>
-        <h3>Background tasks</h3>
-        <p>
-          Execution is disabled in this demo. Stopping speech never cancels a
-          task.
-        </p>
-        <div id="tasks"></div>
-      </section>
-      <p id="error" role="alert"></p>
-      <footer>
-        Built on the public TEN Framework <span id="version"></span>
-      </footer>
-    </main>
+        </section>
+        <section class="panel" id="tasks-panel" hidden>
+          <h3>Background tasks</h3>
+          <div id="tasks"></div>
+        </section>
+        <button id="stop" disabled>Stop current reply</button>
+        <p class="build">Built on TEN Framework · <span id="version"></span></p>
+      </div>
+    </dialog>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

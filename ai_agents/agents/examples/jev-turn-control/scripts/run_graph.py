@@ -84,7 +84,7 @@ def graph_for(mode, overrides):
                 "extension_group": "transport",
                 "property": {
                     "host": "127.0.0.1",
-                    "port": 8765,
+                    "port": int(os.environ.get("JEV_GRAPH_PORT", "8765")),
                     "sample_rate": 16000,
                     "channels": 1,
                     "bytes_per_sample": 2,

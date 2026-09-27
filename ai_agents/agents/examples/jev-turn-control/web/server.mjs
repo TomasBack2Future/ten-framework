@@ -1,10 +1,10 @@
 import http from "node:http";
-import { isIP } from "node:net";
+import { createServer as createNetServer } from "node:net";
 import { observer } from "./observations.mjs";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { WebSocketServer, WebSocket } from "ws";
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -13,26 +13,29 @@ const port = Number(process.env.PORT || 3000),
 const executorAvailable =
   process.env.JEV_CODEX_ENABLED === "true" && mode === "live";
 const revision = process.env.JEV_REVISION || "development";
-const code = process.env.JEV_ACCESS_CODE || "";
+// Sessions are anonymous. IDs route each tab to its own graph, not a login.
 const ttl =
-  Math.min(300, Number(process.env.JEV_SESSION_SECONDS || 300)) * 1000;
+  Math.min(
+    300,
+    Math.max(0.05, Number(process.env.JEV_SESSION_SECONDS) || 300),
+  ) * 1000;
 const origin = process.env.JEV_PUBLIC_ORIGIN || `http://localhost:${port}`;
-const auth = new Map(),
-  attempts = new Map();
-let session = null;
-let stopping = false;
-function cookie(req) {
-  return req.headers.cookie
-    ?.split(";")
-    .map((x) => x.trim())
-    .find((x) => x.startsWith("jev_session="))
-    ?.slice(12);
-}
-function allowed(req) {
-  return (
-    (!code && process.env.JEV_ALLOW_LOCAL === "1") ||
-    (auth.get(cookie(req)) || 0) > Date.now()
-  );
+const sessions = new Map();
+const graphPorts = new Set();
+async function graphPort() {
+  for (;;) {
+    const reservation = createNetServer();
+    await new Promise((resolve, reject) => {
+      reservation.once("error", reject);
+      reservation.listen(0, "127.0.0.1", resolve);
+    });
+    const port = reservation.address().port;
+    await new Promise((resolve) => reservation.close(resolve));
+    if (!graphPorts.has(port)) {
+      graphPorts.add(port);
+      return port;
+    }
+  }
 }
 function json(res, status, data) {
   res.writeHead(status, {
@@ -49,10 +52,9 @@ async function body(req) {
   }
   return JSON.parse(value || "{}");
 }
-function stop() {
-  const old = session;
-  if (!old) return;
-  session = null;
+function stop(old) {
+  if (!old || !sessions.has(old.id)) return;
+  sessions.delete(old.id);
   old.log?.write({ type: "session.ended" });
   old.log?.close().catch(() => console.error("JEV_EVIDENCE_CLOSE_FAILED"));
   clearTimeout(old.expiry);
@@ -64,19 +66,18 @@ function stop() {
     old.worker.exitCode === null &&
     old.worker.signalCode === null
   ) {
-    stopping = true;
     const killTimer = setTimeout(() => old.worker.kill("SIGKILL"), 2000);
     killTimer.unref();
     old.worker.once("close", () => {
       clearTimeout(killTimer);
-      stopping = false;
+      graphPorts.delete(old.graphPort);
     });
     old.worker.kill("SIGTERM");
   }
   for (const timer of old.timers) clearTimeout(timer);
 }
 function emit(s, event) {
-  if (s !== session) return;
+  if (!sessions.has(s.id)) return;
   const e = {
     version: 1,
     event_id: `${s.id}:${++s.seq}`,
@@ -210,54 +211,11 @@ const server = http.createServer(async (req, res) => {
         mode,
         revision,
         executor_available: executorAvailable,
-        authenticated: allowed(req),
+        session_seconds: ttl / 1000,
       });
     if (req.method === "POST") {
       if (req.headers.origin && req.headers.origin !== origin)
         return json(res, 403, { error: "Origin rejected" });
-      if (req.url === "/api/login") {
-        // Enable only behind an ingress that overwrites X-Real-IP.
-        const forwarded = req.headers["x-real-ip"];
-        const ip =
-          process.env.JEV_TRUST_PROXY === "1" &&
-          typeof forwarded === "string" &&
-          isIP(forwarded)
-            ? forwarded
-            : req.socket.remoteAddress;
-        const now = Date.now();
-        if (attempts.size > 1000) attempts.clear();
-        const a = attempts.get(ip) || { count: 0, until: now + 60000 };
-        if (now > a.until) {
-          a.count = 0;
-          a.until = now + 60000;
-        }
-        attempts.set(ip, a);
-        const d = await body(req);
-        if (a.count >= 10)
-          return json(res, 429, { error: "Try again in one minute" });
-        const candidate = Buffer.from(String(d.code || "")),
-          expected = Buffer.from(code);
-        if (
-          !code ||
-          candidate.length !== expected.length ||
-          !timingSafeEqual(candidate, expected)
-        ) {
-          a.count++;
-          return json(res, 401, { error: "Invalid access code" });
-        }
-        for (const [key, end] of auth) if (end < now) auth.delete(key);
-        if (auth.size >= 100)
-          return json(res, 429, { error: "Too many active logins" });
-        const token = randomBytes(32).toString("hex");
-        auth.set(token, now + 3600000);
-        res.setHeader(
-          "Set-Cookie",
-          `jev_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600${origin.startsWith("https:") ? "; Secure" : ""}`,
-        );
-        return json(res, 200, { ok: true });
-      }
-      if (!allowed(req))
-        return json(res, 401, { error: "Enter the demo access code" });
       if (req.url === "/api/end") {
         const request = await body(req);
         if (
@@ -265,37 +223,20 @@ const server = http.createServer(async (req, res) => {
           !/^[a-f0-9]{32}$/.test(request.session_id)
         )
           return json(res, 400, { error: "A valid session_id is required" });
-        if (session && session.owner !== cookie(req))
-          return json(res, 403, {
-            error: "Session belongs to another visitor",
-          });
-        // A delayed failed-Connect cleanup must not stop a newer session.
-        if (session?.id !== request.session_id)
-          return json(res, 200, { ok: true });
-        stop();
+        stop(sessions.get(request.session_id));
         return json(res, 200, { ok: true });
       }
       if (req.url === "/api/debug-unlock") {
-        if (session && session.owner !== cookie(req))
-          return json(res, 403, {
-            error: "Session belongs to another visitor",
-          });
-        if (session) {
-          clearTimeout(session.expiry);
-          session.expiry = null;
-          session.expires_at = null;
-        }
+        const request = await body(req);
+        const s = sessions.get(request.session_id);
+        if (!s) return json(res, 404, { error: "Session ended" });
+        clearTimeout(s.expiry);
+        s.expiry = null;
+        s.expires_at = null;
         return json(res, 200, { unlimited: true, expires_at: null });
       }
       if (req.url === "/api/session") {
-        if (session || stopping)
-          return json(res, 409, {
-            error: "The demo is busy. One private session at a time.",
-          });
         const request = await body(req);
-        // Recheck after the body await: concurrent POSTs must not spawn two graphs.
-        if (session || stopping)
-          return json(res, 409, { error: "The demo is busy" });
         if (
           request.unlimited !== undefined &&
           typeof request.unlimited !== "boolean"
@@ -358,7 +299,7 @@ const server = http.createServer(async (req, res) => {
           });
         const s = {
           id: randomBytes(16).toString("hex"),
-          owner: cookie(req),
+          graphPort: process.env.JEV_GRAPH_COMMAND ? await graphPort() : null,
           started: performance.now(),
           expires_at: request.unlimited ? null : Date.now() + ttl,
           seq: 0,
@@ -375,11 +316,8 @@ const server = http.createServer(async (req, res) => {
           decision_mode: decisionMode,
           decision_profile: decisionProfile,
         });
-        session = s;
-        if (!request.unlimited)
-          s.expiry = setTimeout(() => {
-            if (session === s) stop();
-          }, ttl);
+        sessions.set(s.id, s);
+        if (!request.unlimited) s.expiry = setTimeout(() => stop(s), ttl);
         if (process.env.JEV_GRAPH_COMMAND) {
           s.worker = spawn(
             "bash",
@@ -390,17 +328,22 @@ const server = http.createServer(async (req, res) => {
                 ...process.env,
                 JEV_SESSION_CONFIG: JSON.stringify(settings),
                 JEV_SESSION_ID: s.id,
+                JEV_GRAPH_PORT: String(s.graphPort),
                 JEV_MODE: mode,
               },
               stdio: ["ignore", "inherit", "inherit"],
             },
           );
-          s.worker.on("error", () => stop());
+          s.worker.on("error", () => {
+            graphPorts.delete(s.graphPort);
+            stop(s);
+          });
           s.worker.on("exit", () => {
-            if (session === s) stop();
+            graphPorts.delete(s.graphPort);
+            if (sessions.has(s.id)) stop(s);
           });
         } else if (mode === "live") {
-          stop();
+          stop(s);
           return json(res, 503, { error: "Live graph not configured" });
         } else {
           try {
@@ -414,7 +357,7 @@ const server = http.createServer(async (req, res) => {
               .split("\n")
               .map(JSON.parse);
           } catch {
-            stop();
+            stop(s);
             return json(res, 503, { error: "Mock fixtures not installed" });
           }
         }
@@ -435,6 +378,7 @@ const server = http.createServer(async (req, res) => {
       "/state.js": "state.js",
       "/audio.js": "audio.js",
       "/capture.js": "capture.js",
+      "/workflow.js": "workflow.js",
       "/debug.js": "debug.js",
       "/style.css": "style.css",
     };
@@ -461,21 +405,20 @@ const wss = new WebSocketServer({
   perMessageDeflate: false,
 });
 server.on("upgrade", (req, socket, head) => {
+  const url = new URL(req.url, origin);
+  const s = sessions.get(url.searchParams.get("session_id"));
   if (
-    req.url !== "/ws" ||
+    url.pathname !== "/ws" ||
     req.headers.origin !== origin ||
-    !allowed(req) ||
-    !session ||
-    session.owner !== cookie(req) ||
-    session.client?.readyState === 1
+    !s ||
+    s.client?.readyState === 1
   ) {
     socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
     return;
   }
-  wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
+  wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, s));
 });
-wss.on("connection", (client) => {
-  const s = session;
+wss.on("connection", (client, s) => {
   s.client = client;
   clearTimeout(s.grace);
   let count = 0;
@@ -484,19 +427,23 @@ wss.on("connection", (client) => {
   const pending = [];
   if (!s.worker) client.send(JSON.stringify({ type: "ready" }));
   async function upstream() {
-    if (!s.worker || session !== s) return;
+    if (!s.worker || !sessions.has(s.id)) return;
     connecting = true;
-    for (let i = 0; i < 60 && session === s && client.readyState === 1; i++) {
+    for (
+      let i = 0;
+      i < 60 && sessions.has(s.id) && client.readyState === 1;
+      i++
+    ) {
       try {
         const ws = new WebSocket(
-          process.env.JEV_GRAPH_WS_URL || "ws://127.0.0.1:8765",
+          process.env.JEV_GRAPH_WS_URL || `ws://127.0.0.1:${s.graphPort}`,
           { maxPayload: 262144 },
         );
         await new Promise((resolve, reject) => {
           ws.once("open", resolve);
           ws.once("error", reject);
         });
-        if (session !== s || client.readyState !== 1) {
+        if (!sessions.has(s.id) || client.readyState !== 1) {
           ws.close();
           return;
         }
@@ -532,7 +479,7 @@ wss.on("connection", (client) => {
         await new Promise((r) => setTimeout(r, 250));
       }
     }
-    if (session === s) client.close(1011, "Graph unavailable");
+    if (sessions.has(s.id)) client.close(1011, "Graph unavailable");
   }
   upstream();
   client.on("message", (raw) => {
@@ -573,7 +520,7 @@ wss.on("connection", (client) => {
             [1600, "Wait, I meant tomorrow.", true, "two"],
           ].map(([delay, text, final, segment]) =>
             setTimeout(() => {
-              if (session === s && s.upstream?.readyState === 1)
+              if (sessions.has(s.id) && s.upstream?.readyState === 1)
                 s.upstream.send(
                   JSON.stringify({
                     type: "data",
@@ -627,19 +574,14 @@ wss.on("connection", (client) => {
         );
     }
     s.upstream?.close();
-    if (session === s)
-      s.grace = setTimeout(() => {
-        if (session === s) stop();
-      }, 10000);
+    // Keep the anonymous session available for reconnect until its five-minute expiry.
   });
   client.on("error", () => {});
 });
-if (!code && process.env.JEV_ALLOW_LOCAL !== "1")
-  throw Error("JEV_ACCESS_CODE is required");
 server.listen(port, process.env.HOST || "0.0.0.0", () =>
   console.log(`Jev ${mode} ready on ${port} revision ${revision}`),
 );
 process.on("SIGTERM", () => {
-  stop();
+  for (const s of sessions.values()) stop(s);
   server.close(() => process.exit(0));
 });

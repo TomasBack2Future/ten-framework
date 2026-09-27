@@ -29,7 +29,9 @@ task smoke
 ```
 
 The Web owner supplies the protected HTTPS gateway and browser UI. The native
-WebSocket binds only `127.0.0.1:8765`; one graph process owns one session.
+Standalone WebSocket binds only `127.0.0.1:8765`; the web gateway assigns each
+anonymous session its own loopback port via `JEV_GRAPH_PORT`. One graph process
+owns one session.
 `mock` uses deterministic labels and an audible synthetic test tone, not speech.
 `live` loads the actual overseas provider graph. A missing key fails startup.
 No secret is embedded in the graph file or browser configuration.

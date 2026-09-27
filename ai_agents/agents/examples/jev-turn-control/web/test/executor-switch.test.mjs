@@ -41,8 +41,7 @@ for (const enabled of ["false", "true"]) {
         },
         body: JSON.stringify(data),
       });
-    const login = await post("/api/login", { code: "test-only-secret" });
-    const cookie = login.headers.get("set-cookie").split(";")[0];
+    const cookie = undefined;
     assert.equal(
       (
         await post(

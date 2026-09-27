@@ -1,4 +1,4 @@
-/** Page-local deliberate gesture; authentication is enforced by the server. */
+/** Page-local deliberate gesture; affects only the selected anonymous session. */
 export class DebugUnlock {
   constructor() {
     this.count = 0;

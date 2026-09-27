@@ -26,6 +26,11 @@ for (const failure of ["unlock", "busy", "initialize", "cleanup"]) {
           value: "",
           textContent: "",
           hidden: false,
+          dataset: {},
+          setAttribute() {},
+          querySelector() {
+            return { textContent: "" };
+          },
           replaceChildren() {},
         });
       return elements.get(id);
@@ -33,7 +38,10 @@ for (const failure of ["unlock", "busy", "initialize", "cleanup"]) {
     let broken = true,
       closed = 0;
     const requests = [];
-    replace("document", { getElementById: get });
+    replace("document", {
+      getElementById: get,
+      createElement: () => ({ textContent: "" }),
+    });
     const listeners = {};
     replace("window", {
       addEventListener(name, fn) {
@@ -52,6 +60,9 @@ for (const failure of ["unlock", "busy", "initialize", "cleanup"]) {
     replace(
       "AudioContext",
       class {
+        createGain() {
+          return { gain: { value: 1 }, connect() {} };
+        }
         async resume() {
           if (broken && failure === "unlock") throw new Error("unlock failed");
         }

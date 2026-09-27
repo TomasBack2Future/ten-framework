@@ -32,8 +32,6 @@ spec:
         # Kong overwrites X-Real-IP with $remote_addr (verified on this ingress).
         - {name: JEV_TRUST_PROXY, value: '1'}
         - {name: JEV_EVENT_LOG_DIR, value: /var/lib/jev-evidence}
-        - name: JEV_ACCESS_CODE
-          valueFrom: {secretKeyRef: {name: jev-demo-access, key: JEV_ACCESS_CODE}}
         resources:
           requests: {cpu: 100m, memory: 256Mi}
           limits: {cpu: '2', memory: 2Gi}

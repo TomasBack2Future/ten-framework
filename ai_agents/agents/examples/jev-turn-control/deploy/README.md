@@ -30,17 +30,14 @@ uploaded to GitHub. CI does not imply automated cluster deployment.
 Required existing Secrets (only in this namespace):
 
 - `jev-provider-keys`: `SONIOX_API_KEY`, `GROQ_API_KEY`, `CARTESIA_API_KEY`, `JEV_API_KEY`.
-- `jev-demo-access`: `JEV_ACCESS_CODE` (shared demo access code).
 - `jev-demo-tls`: dedicated TLS certificate/key.
 
 Provider secrets enter only the live pod environment. The public web-only
-preview and mock runtime need no provider credentials. The login cookie lasts
-one hour; each session has a five-minute hard deadline and only one concurrent
-visitor. Access code retrieval is an operator action:
-
-```bash
-kubectl -n ten-jev-demo get secret jev-demo-access -o jsonpath='{.data.JEV_ACCESS_CODE}' | base64 --decode
-```
+preview and mock runtime need no provider credentials. The demo opens without
+login or an access code. Each anonymous session normally expires after five
+minutes. A random session ID routes its WebSocket and cleanup to its own graph;
+visitors do not share a fixed graph port or a global single-session reservation.
+Provider keys remain server-side. Origin checks and transport validation remain.
 
 Never paste provider keys into the demo. The visible prompt field only overrides
 the start-decision rubric and applies to the next session. Backchannel defaults
@@ -56,8 +53,8 @@ kubectl -n ten-jev-demo rollout status deployment/jev-demo --timeout=120s
 ```
 
 Or run `deploy.sh` with a previously verified runtime digest and mode. Deployment
-strategy is Recreate because the demo owns one fixed internal WebSocket port.
-Rollback must recheck `/healthz` and an authenticated snapshot. Do not delete the
+strategy is Recreate because the evidence PVC uses ReadWriteOnce.
+Rollback must recheck `/healthz` and a session snapshot. Preserve the PVC. Do not delete the
 namespace, Secrets, or shared Kong gateway as a rollback operation.
 
 ## TLS renewal
@@ -76,26 +73,21 @@ zero when finished; retain the route for the next renewal.
 
 ## Debug sessions and observations
 
-After authenticating, click **TURN CONTROL LAB** 10 times, with no gap over two
-seconds, to disable the session expiry for this page. If connected, the server
-clears the active expiry timer; if disconnected, the next call carries the debug
-flag. Reloading resets the gesture. Authentication, single visitor, size/rate and
-playback backpressure limits remain. Normal calls still expire after five minutes.
+Click **TURN CONTROL LAB** 10 times, with no gap over two seconds, to disable
+the session expiry for this page. If connected, the server clears only that
+session's timer; the next call carries the debug flag. Reload resets the gesture.
+Normal calls still expire after five minutes. This hidden feature is retained.
 
-The runtime writes bounded JSONL observations to `JEV_EVENT_LOG_DIR` (default
-`/tmp/jev-observations`): up to 10 session files, 2 MiB each, mode 0600. Records carry
-build revision/session/response IDs and ASR/decision/timer/generation-error/playback/
-alignment events. Text is redacted by default; set `JEV_EVENT_LOG_TEXT=1` only for
-an authorized transcript investigation. Credentials are always redacted. No audio
-is recorded. Files survive graph process exits, but are **not durable across Pod
-replacement**: export needed evidence before rollout. No HTTP log-download endpoint
-is exposed. A storage/backpressure cap emits `observation.limit` instead of growing
-unbounded. Export through authorized namespace-scoped `kubectl exec`/`cp` only.
+Full evidence is written to the mounted `JEV_EVENT_LOG_DIR`, including original
+provider requests/streams, ASR, TTS/audio, playback and browser controls. See
+[the evidence contract](../docs/evidence.md) for files, export and migration.
+There is no public evidence download endpoint. Existing evidence is not deleted.
 
-`JEV_TRUST_PROXY=1` uses validated `X-Real-IP` for failed-login limits. Enable only
-behind an ingress that overwrites this header. The dedicated khipaa Kong config was
-verified to set `X-Real-IP $remote_addr`; the manifest opts in. Direct local runs
-ignore forwarded headers. Successful logins do not consume the failure allowance.
+The one-page workflow is driven by observation events and audio arrival. Details
+contains history, settings, prompts and logs. Speaker mute freezes the audible
+prefix; the rest of that reply stays silent even after unmute, which applies to
+the next reply. Muted samples are never reported as fully heard. Microphone mute
+is independent and releases the capture device.
 
 The gateway sends `ready` only after the TEN WebSocket is connected. The microphone
 stays disabled during warmup; early control messages are bounded/queued and early

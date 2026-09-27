@@ -25,6 +25,9 @@ test("cancel stops active and queued sources; late audio cannot restart old resp
     currentTime = 0;
     destination = {};
     state = "running";
+    createGain() {
+      return { gain: { value: 1 }, connect() {} };
+    }
     async resume() {}
     async close() {}
     createBuffer(c, n, r) {
@@ -76,6 +79,9 @@ test("end notification arriving before the final PCM batch does not discard audi
   class Context {
     currentTime = 0;
     destination = {};
+    createGain() {
+      return { gain: { value: 1 }, connect() {} };
+    }
     async resume() {}
     async close() {}
     createBuffer(c, n, r) {
