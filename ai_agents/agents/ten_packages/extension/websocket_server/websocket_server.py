@@ -29,6 +29,7 @@ class WebSocketServerManager:
         port: int,
         ten_env: AsyncTenEnv,
         on_audio_callback: Optional[Callable[[AudioData], None]] = None,
+        on_data_callback: Optional[Callable] = None,
     ):
         """
         Initialize WebSocket server manager
@@ -43,6 +44,7 @@ class WebSocketServerManager:
         self.port = port
         self.ten_env = ten_env
         self.on_audio_callback = on_audio_callback
+        self.on_data_callback = on_data_callback
 
         self.server = None
         self.current_client: Optional[Any] = None
@@ -60,7 +62,7 @@ class WebSocketServerManager:
         self.running = True
         try:
             self.server = await websockets.serve(
-                self._handle_client, self.host, self.port
+                self._handle_client, self.host, self.port, max_size=32768
             )
             self.ten_env.log_info(
                 f"WebSocket server started on ws://{self.host}:{self.port}"
@@ -154,6 +156,22 @@ class WebSocketServerManager:
             # Parse JSON message
             data = json.loads(message)
 
+            if not isinstance(data, dict):
+                await self._send_error(websocket, "Expected JSON object")
+                return
+            if data.get("type") == "data":
+                name = data.get("name")
+                payload = data.get("data")
+                if (
+                    name not in ("jev_control", "jev_playback", "jev_asr")
+                    or not isinstance(payload, dict)
+                    or not self.on_data_callback
+                ):
+                    await self._send_error(websocket, "Unsupported data")
+                    return
+                await self.on_data_callback(name, payload)
+                return
+
             # Validate message format
             if "audio" not in data:
                 await self._send_error(
@@ -165,7 +183,7 @@ class WebSocketServerManager:
             # Decode base64 audio
             try:
                 audio_base64 = data["audio"]
-                pcm_data = base64.b64decode(audio_base64)
+                pcm_data = base64.b64decode(audio_base64, validate=True)
             except Exception as e:
                 await self._send_error(
                     websocket, f"Invalid base64 audio data: {e}"
@@ -174,6 +192,9 @@ class WebSocketServerManager:
 
             # Extract metadata
             metadata = data.get("metadata", {})
+            if not isinstance(metadata, dict) or len(pcm_data) % 2:
+                await self._send_error(websocket, "Invalid PCM metadata/length")
+                return
             metadata["client_id"] = client_id
 
             # Create audio data container
