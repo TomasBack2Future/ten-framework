@@ -78,6 +78,7 @@ jobs:
         docker run --rm --network none ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} .venv/bin/python -m unittest discover -s executor/tests -p test_adapter.py
         docker run --rm --network none ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} .venv/bin/python -m unittest discover -s executor/tests -p test_review_lifecycle.py
         docker run --rm --network none ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} .venv/bin/python -m unittest discover -s executor/tests -p test_evaluation.py
+        docker run --rm --network none ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} .venv/bin/python -m unittest discover -s executor/tests -p test_runtime_routing.py
     - uses: docker/login-action@v3
       if: github.event_name == 'push'
       with:

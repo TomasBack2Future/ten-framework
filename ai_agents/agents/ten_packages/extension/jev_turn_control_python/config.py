@@ -6,6 +6,7 @@ from copy import deepcopy
 from .profiles import profile_for, validate_criteria
 
 DEFAULTS = {
+    "executor": {"enabled": False},
     "voice": {"prompt": ""},
     "compression": {
         "enabled": False,
@@ -85,7 +86,7 @@ DEFAULTS["route"] = {
     "threshold": 0.75,
     "task_control_threshold": 0.75,
 }
-DEFAULTS["support"] = {"prompt": "", "criteria": {}, "threshold": 0.0}
+DEFAULTS["support"] = {"prompt": "", "criteria": {}, "threshold": 0.75}
 
 
 @dataclass
@@ -163,6 +164,8 @@ class Config:
                     raise ValueError("prompt exceeds 2000 characters")
                 if key.endswith("threshold") and not 0 <= value <= 1:
                     raise ValueError("threshold outside [0,1]")
+        if self["support"]["threshold"] <= 0:
+            raise ValueError("support threshold must be positive")
         sched = self["scheduling"]
         if sched["max_inflight"] != 1:
             raise ValueError(

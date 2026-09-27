@@ -60,14 +60,24 @@ connections are reused and redirects disabled. Invalid labels, distributions,
 empty compression, HTTP failures and timeouts reject the decision. The voice
 adapter handles these through its existing bounded-wait/hold behavior.
 
+Baseline runtime routing now uses a .75 support threshold; zero support thresholds
+are rejected. This is a new runtime safety policy, not a recalibration of the
+frozen offline benchmark or a change to baseline voice timing.
+
 `DecisionProvider.route` applies separate intent and support thresholds, returns
 `wait` below the relevant threshold, and strips non-visible metadata.
 `executor.routing.RuntimeRouter(session_decision_provider)` adapts it to the
 executor sample interface. The existing offline `Router`, locked benchmark
-specs, and stored scores are unchanged. The web demo still has execution
-disabled: this PR does **not** connect task execution to voice, execute a tool,
-or relax capability, parameter, stability or task-owner checks. Hosts integrating
-the runtime router must retain those deterministic checks.
+specs, and stored scores are unchanged. After integration with PR #5, the voice extension **does** submit final ASR
+inputs to an optional per-call artifact session when both operator and session
+gates enable it. The feature remains off by default. This P1 path uses
+`ExecutorClient` → per-call SDK session, independently of `RuntimeRouter` and
+provider classifications. Selecting Jev/SD/SD → Jev does not select a different
+executor, create a second session, cancel background work, or gate that mailbox
+on classifier success. Start/stop classification continues to control speech.
+The existing call-session artifact policy and ownership checks remain intact.
+`RuntimeRouter` is the separate adapter for hosts using explicit intent/support
+routing; it is not the P1 call-session admission path.
 
 ## Evidence and limits
 
@@ -89,7 +99,7 @@ Selection lock SHA-256:
 `cef4870c763959c355eb086ead62872ce9b864780e17aeca457f31b7e1145474`.
 Prompt sources and attribution: [PROMPT_PROVENANCE.md](PROMPT_PROVENANCE.md).
 
-## Integration validation (2026-09-27)
+## Initial validation at 344ba4d (2026-09-27)
 
 - Python 3.10, TEN runtime 0.11.73: full example suite, including real graph
   lifecycle and WebSocket roundtrip, **80 passed**.
@@ -106,3 +116,23 @@ Prompt sources and attribution: [PROMPT_PROVENANCE.md](PROMPT_PROVENANCE.md).
   not a new latency percentile estimate or accuracy score. The temporary Pod
   was deleted and its absence checked. No serving deployment was modified.
   [Sanitized results and source hashes](validation/provider-smoke-20260927.json).
+
+
+## Review fixes and integration onto ee0dbec
+
+Both review findings were reproduced and addressed: baseline supported scores
+below .75 now return `wait` for execute and task control; the runtime image's
+pre-publication CI step now executes `test_runtime_routing.py`. The executor CI
+also discovers that module in its full suite. Baseline voice prompts and timing,
+tuned prompt artifacts, frozen test data and offline benchmark policies did not
+change. Provider-specific voice architecture descriptions replace stale claims
+that SD is offline-only.
+
+PR #4 duration accounting and PR #5 call-session lifecycle/backpressure behavior
+are preserved. New regressions cover all three provider modes and both profiles:
+final-only submission, duplicate-final fencing, classifier timeout independence,
+speech-stop independence, one call identity and completion notification. Web
+regressions exercise the operator gate for all six combinations. Local integrated
+TEN tests: **109 passed, 14 subtests passed**; Web: **19 passed**. The historical
+khipaa artifact above identifies the initial source hashes and is not presented
+as a fresh network measurement of this integrated tree.

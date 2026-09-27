@@ -1,0 +1,72 @@
+# OPTIONAL P1: this file is not applied by deploy.sh. Default replica count is 0.
+# Enable only after building/pinning the executor image, creating the two Secrets,
+# and explicitly configuring the voice host. No public Ingress.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jev-executor
+  namespace: ten-jev-demo
+spec:
+  replicas: 0
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: jev-executor}
+  template:
+    metadata:
+      labels: {app: jev-executor}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 20
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001}
+      containers:
+      - name: executor
+        image: ghcr.io/tomasback2future/jev-executor:REPLACE_WITH_SHA
+        ports: [{containerPort: 8080, name: http}]
+        env:
+        - {name: JEV_CODEX_ENABLED, value: 'false'}
+        - {name: CODEX_HOME, value: /work/codex}
+        - name: OPENAI_API_KEY
+          valueFrom: {secretKeyRef: {name: jev-codex-credentials, key: api-key}}
+        - name: JEV_EXECUTOR_TOKEN
+          valueFrom: {secretKeyRef: {name: jev-executor-access, key: token}}
+        volumeMounts: [{name: work, mountPath: /work}, {name: temp, mountPath: /tmp}]
+        resources:
+          requests: {cpu: 100m, memory: 256Mi}
+          limits: {cpu: '2', memory: 1Gi}
+        readinessProbe:
+          httpGet: {path: /healthz, port: http}
+          periodSeconds: 5
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          seccompProfile: {type: RuntimeDefault}
+      volumes:
+      - name: work
+        emptyDir: {medium: Memory, sizeLimit: 256Mi}
+      - name: temp
+        emptyDir: {medium: Memory, sizeLimit: 64Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jev-executor
+  namespace: ten-jev-demo
+spec:
+  selector: {app: jev-executor}
+  ports: [{port: 8080, targetPort: http}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jev-executor-ingress
+  namespace: ten-jev-demo
+spec:
+  podSelector:
+    matchLabels: {app: jev-executor}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels: {app: jev-demo}
+    ports: [{protocol: TCP, port: 8080}]

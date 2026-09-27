@@ -445,3 +445,140 @@ def test_provider_errors_preserve_hold_policy(mode):
         )
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("mode", ["jev", "sd", "sd_jev"])
+def test_baseline_support_gate_rejects_low_confidence(mode):
+    async def run():
+        config = Config.load(
+            {"provider": {"name": mode, "profile": "baseline"}}
+        )
+        assert config["support"]["threshold"] == 0.75
+        provider = DecisionProvider(config)
+        for route in ("execute", "task_control"):
+            for score in (0, 0.01, 0.74, 0.75):
+                provider.decide = AsyncMock(
+                    return_value={
+                        "route": {
+                            "label": route,
+                            "score": 0.75,
+                            "probabilities": {route: 0.75},
+                        },
+                        "support": {
+                            "label": "supported",
+                            "score": score,
+                            "probabilities": {"supported": score},
+                        },
+                    }
+                )
+                result = await provider.route(
+                    {"text": "Create a report", "stable": True}
+                )
+                assert result["route"] == route
+                assert result["support"] == (
+                    "supported" if score >= 0.75 else "wait"
+                )
+        with pytest.raises(ValueError, match="positive"):
+            Config.load(
+                {
+                    "provider": {"profile": "baseline"},
+                    "support": {"threshold": 0},
+                }
+            )
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("mode", ["jev", "sd", "sd_jev"])
+@pytest.mark.parametrize("profile", ["baseline", "tuned"])
+def test_call_session_remains_independent_of_provider_and_profile(
+    mode, profile, monkeypatch
+):
+    extension = importlib.import_module(f"{PACKAGE}.extension")
+    executor_module = importlib.import_module(f"{PACKAGE}.executor_client")
+    memory = importlib.import_module(f"{PACKAGE}.memory")
+    monkeypatch.setenv("JEV_CODEX_ENABLED", "true")
+
+    async def run(fails):
+        config = Config.load(
+            {
+                "provider": {
+                    "name": mode,
+                    "profile": profile,
+                    "failure_policy": "hold",
+                },
+                "executor": {"enabled": True},
+            }
+        )
+        adapter = extension.JevTurnControlExtension("mode_session")
+        engine = adapter.engine = TurnEngine(config)
+        adapter.now = lambda: 0
+        adapter.executor = executor_module.ExecutorClient(
+            engine.emit, config["executor"]["enabled"]
+        )
+        adapter.executor.sid = "one-call"
+        adapter.provider = DecisionProvider(config)
+        adapter.provider.decide = AsyncMock(
+            side_effect=asyncio.TimeoutError if fails else None,
+            return_value={"start": {"label": "continuation", "score": 1}},
+        )
+        adapter.provider.route = AsyncMock(
+            side_effect=AssertionError("P1 does not use RuntimeRouter")
+        )
+        adapter.pump = AsyncMock()
+        partial = {
+            "text": "Create",
+            "final": False,
+            "start_ms": 0,
+            "duration_ms": 50,
+        }
+        final = {
+            "text": "Create a report",
+            "final": True,
+            "start_ms": 0,
+            "duration_ms": 100,
+        }
+        adapter.handle_data("asr_result", partial)
+        assert adapter.executor.queue.empty()
+        adapter.handle_data("asr_result", final)
+        adapter.handle_data("asr_result", final)
+        assert adapter.executor.queue.qsize() == 1
+        adapter.now = lambda: 190
+        await adapter.classify(engine.begin_decision(120))
+        assert adapter.executor.queue.qsize() == 1
+        adapter.provider.route.assert_not_called()
+        engine.start("answer")
+        request = memory.voice_request(
+            engine.drain_actions()[-1], config, adapter.executor.state
+        )
+        assert "never wait for its completion" in request["prompt"]
+        provider_text = {
+            "jev": "Jev classifies the structured state directly.",
+            "sd": "ScaleDown classifies the structured state directly.",
+            "sd_jev": "ScaleDown compresses the state, then Jev classifies it.",
+        }[mode]
+        assert provider_text in request["prompt"]
+        engine.stop("manual_stop")
+        assert (
+            adapter.executor.sid == "one-call" and not adapter.executor.failed
+        )
+        assert adapter.executor.queue.qsize() == 1
+        adapter.executor.queue.get_nowait()
+        adapter.executor.state = {
+            "status": "completed",
+            "current": True,
+            "notify_user": True,
+            "version": 1,
+            "input_revision": adapter.executor.latest_revision,
+        }
+        engine.pending = False
+        engine.stopping = None
+        before = deepcopy(engine.history)
+        adapter.now = lambda: 2000
+        adapter.notify_executor()
+        assert engine.responses[engine.active]["mode"] == "executor_result"
+        assert engine.history == before
+        assert adapter.executor.sid == "one-call"
+
+    for fails in (False, True):
+        asyncio.run(run(fails))

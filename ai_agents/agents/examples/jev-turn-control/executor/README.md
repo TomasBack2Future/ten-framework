@@ -1,5 +1,9 @@
 # Optional artifact executor
 
+For the P1 live call-scoped service (one call, one thread), deployment gates and
+credential injection, see [CALL_SESSIONS.md](CALL_SESSIONS.md). The task-scoped
+adapter below remains the offline evaluation/reference path.
+
 Default **disabled**. This package does not change the shipping graph, controller,
 providers or shared event schema. It requires Python 3.10+ for the offline core;
 the optional official SDK is pinned in `requirements-sdk.txt`.
@@ -82,7 +86,7 @@ mount the user's desktop Codex authentication. The only model credential is the
 explicit executor OPENAI_API_KEY. Container enforcement is checked before SDK
 calls; fake backend has no network.
 
-`Dockerfile` is a build recipe, not a deployed service. Do not expose SDK
+`Dockerfile` builds the optional call-session service; it is not deployed by default. Do not expose SDK
 app-server publicly. Use readonly root filesystem, dedicated writable /work,
 resource limits, no service-account token and outbound model-only network policy
 when the infrastructure owner enables it. The module is not a multi-tenant

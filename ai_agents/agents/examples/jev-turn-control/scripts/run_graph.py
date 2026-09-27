@@ -19,6 +19,7 @@ def graph_for(mode, overrides):
         "provider.name",
         "provider.profile",
         "voice.prompt",
+        "executor.enabled",
         "compression.enabled",
         "compression.prompt",
         "compression.summary_prompt",
@@ -56,6 +57,12 @@ def graph_for(mode, overrides):
             or not limits[key][0] <= value <= limits[key][1]
         ):
             raise ValueError("numeric setting outside allowed range")
+        if (
+            key == "executor.enabled"
+            and value
+            and os.environ.get("JEV_CODEX_ENABLED") != "true"
+        ):
+            raise ValueError("executor unavailable")
         section, option = key.split(".")
         config.setdefault(section, {})[option] = value
     # Mock transport must never call paid providers, regardless of UI selection.
