@@ -8,7 +8,12 @@ if [[ -n "${TMAN_CONFIG:-}" ]]; then ARGS+=(-c "$TMAN_CONFIG"); fi
 if ! test -x .venv/bin/python; then
     uv venv --python python3 --system-site-packages .venv
 fi
-uv pip install --link-mode=copy --python .venv/bin/python -r requirements-dev.txt
+uv pip install --link-mode=copy --python .venv/bin/python -r requirements-dev.txt \
+  -r ../../ten_packages/extension/websocket_server/requirements.txt \
+  -r ../../ten_packages/extension/soniox_asr_python/requirements.txt \
+  -r ../../ten_packages/extension/openai_llm2_python/requirements.txt \
+  -r ../../ten_packages/extension/cartesia_tts/requirements.txt \
+  -r tenapp/ten_packages/system/ten_ai_base/requirements.txt
 python3 - <<'CHECK'
 import json
 from pathlib import Path
