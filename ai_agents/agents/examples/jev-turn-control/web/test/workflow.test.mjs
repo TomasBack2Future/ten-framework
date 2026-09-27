@@ -176,7 +176,12 @@ test("discarded results stamped with current revision cannot erase a fresh decis
     w.apply({
       type,
       input_revision: 2,
-      payload: { decision_kind: "start", label: "answer", applied: false },
+      payload: {
+        decision_kind: "start",
+        label: "answer",
+        applied: false,
+        discard_reason: "input_revision",
+      },
     });
     assert.equal(w.decisions.start, "waiting");
   }
@@ -249,4 +254,45 @@ test("recorded stop lifecycle clears PASS at ACK and the subsequent wait checkpo
     store.events.find((e) => e.seq === 1479).type,
     "response.cancelled",
   );
+});
+
+test("valid unapplied decisions finish WAIT without triggering an action", () => {
+  for (const [kind, label, score] of [
+    ["stop", "continue", 0.95],
+    ["start", "answer", 0.1],
+  ]) {
+    const w = new Workflow();
+    if (kind === "stop") {
+      w.apply({
+        type: "response.started",
+        response_id: "r1",
+        input_revision: 1,
+      });
+      w.audio("r1");
+    }
+    w.apply({
+      type: "decision.started",
+      input_revision: 2,
+      payload: { decision_kind: kind },
+    });
+    assert.equal(w.decisions[kind], "waiting");
+    w.apply({
+      type: "decision.completed",
+      response_id: kind === "stop" ? "r1" : null,
+      input_revision: 2,
+      payload: {
+        decision_kind: kind,
+        label,
+        score,
+        applied: false,
+        discard_reason: "",
+      },
+    });
+    assert.equal(w.decisions[kind], "idle");
+    assert.equal(w.nodes.decision, "idle");
+    assert.equal(w.status, `${kind}: ${label}`);
+    assert.equal(w.interrupt, false);
+    assert.equal(w.stopping, false);
+    if (kind === "stop") assert.equal(w.playback, true);
+  }
 });

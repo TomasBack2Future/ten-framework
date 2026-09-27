@@ -91,7 +91,7 @@ export class Workflow {
       if (
         revision < this.inputRevision ||
         (e.response_id && e.response_id !== this.response) ||
-        p.applied === false ||
+        !!p.discard_reason ||
         e.type === "decision.discarded"
       )
         return;
