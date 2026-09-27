@@ -6,6 +6,7 @@ import math
 import os
 import struct
 import time
+import uuid
 
 import aiohttp
 
@@ -20,6 +21,7 @@ from ten_runtime import (
     StatusCode,
 )
 
+from .evidence import Evidence
 from .executor_client import ExecutorClient
 from .config import Config
 from .engine import TurnEngine
@@ -47,6 +49,11 @@ class JevTurnControlExtension(AsyncExtension):
         self.audio_response = None
         self.executor = None
         self.executor_notified = 0
+        self.evidence = None
+
+    def record(self, kind, payload, response_id=None):
+        if self.evidence:
+            self.evidence.write(kind, payload, response_id)
 
     def now(self):
         return int((time.monotonic() - self.started) * 1000)
@@ -63,11 +70,21 @@ class JevTurnControlExtension(AsyncExtension):
         if error:
             raise ValueError("cannot read turn configuration")
         self.started = time.monotonic()
+        session_id = os.environ.get("JEV_SESSION_ID") or uuid.uuid4().hex
+        self.evidence = Evidence(session_id)
         self.engine = TurnEngine(
             Config.load(json.loads(raw or "{}")),
-            os.environ.get("JEV_SESSION_ID", "demo"),
+            session_id,
+            event_sink=self.record,
         )
-        self.provider = DecisionProvider(self.engine.config)
+        self.record(
+            "graph.started",
+            {
+                "config": self.engine.config.values,
+                "engine_monotonic_origin": self.started,
+            },
+        )
+        self.provider = DecisionProvider(self.engine.config, self.record)
         self.executor = ExecutorClient(
             self.engine.emit, self.engine.config["executor"]["enabled"]
         )
@@ -83,6 +100,7 @@ class JevTurnControlExtension(AsyncExtension):
             self.engine.tick(self.now())
             request = self.engine.begin_decision(self.now())
             if request:
+                request["response_id"] = self.engine.active
                 self.spawn(self.classify(request))
             compression = self.engine.begin_compression(self.now())
             if compression:
@@ -114,8 +132,18 @@ class JevTurnControlExtension(AsyncExtension):
                 self.executor_notified = state["version"]
 
     async def classify(self, request):
+        self.record("decision.request", request, request.get("response_id"))
+        started = time.monotonic_ns()
         try:
             answers = await self.provider.decide(request)
+            self.record(
+                "decision.result",
+                {
+                    "request_id": request["request_id"],
+                    "answers": answers,
+                    "duration_ns": time.monotonic_ns() - started,
+                },
+            )
             self.engine.complete_decision(request, answers, self.now())
         except (
             aiohttp.ClientError,
@@ -123,7 +151,15 @@ class JevTurnControlExtension(AsyncExtension):
             ValueError,
             KeyError,
             TypeError,
-        ):
+        ) as exc:
+            self.record(
+                "decision.failure",
+                {
+                    "request_id": request["request_id"],
+                    "error_type": type(exc).__name__,
+                    "duration_ns": time.monotonic_ns() - started,
+                },
+            )
             self.engine.complete_decision(request, {}, self.now(), error=True)
         await self.pump()
 
@@ -318,6 +354,7 @@ class JevTurnControlExtension(AsyncExtension):
             },
             rid,
         )
+        self.record("llm.request", request, rid)
         command = Cmd.create("chat_completion")
         command.set_dests([Loc("", "", "llm")])
         command.set_property_from_json(None, json.dumps(request))
@@ -332,6 +369,7 @@ class JevTurnControlExtension(AsyncExtension):
             if result is None or result.is_final():
                 continue
             raw, _ = result.get_property_to_json(None)
+            self.record("llm.stream", json.loads(raw), rid)
             response = parse_llm_response(raw)
             if isinstance(response, LLMResponseMessageDelta):
                 text = response.delta or ""
@@ -369,6 +407,9 @@ class JevTurnControlExtension(AsyncExtension):
 
     async def tts(self, rid, text, final):
         if rid == self.engine.active:
+            self.record(
+                "tts.input", {"text": text, "text_input_end": final}, rid
+            )
             await self.send_data(
                 "tts_text_input",
                 {
@@ -411,6 +452,22 @@ class JevTurnControlExtension(AsyncExtension):
         meta = json.loads(metadata) if not error and metadata else {}
         request_id, _ = frame.get_property_string("request_id")
         rid = meta.get("response_id") or request_id
+        if self.evidence:
+            buf = frame.lock_buf()
+            pcm = bytes(buf)
+            frame.unlock_buf(buf)
+            self.evidence.audio(
+                pcm,
+                {
+                    **meta,
+                    "sample_rate": frame.get_sample_rate(),
+                    "channels": frame.get_number_of_channels(),
+                    "bytes_per_sample": frame.get_bytes_per_sample(),
+                    "timestamp": frame.get_timestamp(),
+                    "accepted": bool(rid and rid == self.engine.active),
+                },
+                rid,
+            )
         if not rid or rid != self.engine.active:
             return
         self.engine.audio(
@@ -429,6 +486,12 @@ class JevTurnControlExtension(AsyncExtension):
             return
         try:
             payload = json.loads(raw)
+            if self.evidence:
+                self.record(
+                    "graph.input",
+                    {"name": data.get_name(), "data": payload},
+                    payload.get("response_id", payload.get("request_id")),
+                )
             self.handle_data(data.get_name(), payload)
         except (ValueError, TypeError, KeyError):
             self.engine.emit(
@@ -589,4 +652,7 @@ class JevTurnControlExtension(AsyncExtension):
             await self.executor.close()
         if self.provider:
             await self.provider.close()
+        if self.evidence:
+            self.record("graph.closed", {})
+            await asyncio.to_thread(self.evidence.close)
         ten_env.log_info("JEV_EXTENSION_STOPPED")

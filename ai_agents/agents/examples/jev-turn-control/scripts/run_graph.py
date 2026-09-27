@@ -129,6 +129,7 @@ def graph_for(mode, overrides):
                 "extension_group": "llm",
                 "property": {
                     "base_url": "https://api.groq.com/openai/v1",
+                    "emit_evidence": bool(os.environ.get("JEV_EVENT_LOG_DIR")),
                     "api_key": "${env:GROQ_API_KEY}",
                     "model": "${env:GROQ_MODEL|openai/gpt-oss-20b}",
                     "max_tokens": 512,
@@ -159,6 +160,15 @@ def graph_for(mode, overrides):
             },
         ]
         graph["connections"] += [
+            {
+                "extension": "llm",
+                "data": [
+                    {
+                        "name": "llm_evidence",
+                        "dest": [{"extension": "turn_control"}],
+                    }
+                ],
+            },
             {
                 "extension": "websocket_server",
                 "audio_frame": [

@@ -3,6 +3,8 @@
 import asyncio
 import json
 import os
+import time
+import contextvars
 
 import aiohttp
 
@@ -51,8 +53,10 @@ def mock_answers(request):
 class DecisionProvider:
     """Reuse HTTPS connections; a timeout covers both stages of sd_jev."""
 
-    def __init__(self, config):
+    def __init__(self, config, evidence=None):
         self.config = config
+        self.evidence = evidence
+        self.trace = contextvars.ContextVar("decision_trace", default=None)
         self.client = None
 
     async def decide(self, request):
@@ -68,6 +72,12 @@ class DecisionProvider:
             raise ValueError("invalid provider response") from exc
 
     async def _post(self, endpoint, body, secret_env, header):
+        started = time.monotonic_ns()
+        trace = self.trace.get()
+        if self.evidence:
+            self.evidence(
+                "decision.http.request", {"trace": trace, "body": body}
+            )
         key = os.environ.get(secret_env, "")
         if not key:
             raise ValueError("provider credential unavailable")
@@ -78,10 +88,44 @@ class DecisionProvider:
             endpoint, json=body, headers={header: value}, allow_redirects=False
         ) as response:
             if response.status != 200:
+                if self.evidence:
+                    self.evidence(
+                        "decision.http.failure",
+                        {
+                            "trace": trace,
+                            "status": response.status,
+                            "duration_ns": time.monotonic_ns() - started,
+                            "body": await response.text(),
+                        },
+                    )
                 raise ValueError(f"provider HTTP {response.status}")
-            return await response.json()
+            data = await response.json()
+            if self.evidence:
+                self.evidence(
+                    "decision.http.response",
+                    {
+                        "trace": trace,
+                        "status": response.status,
+                        "duration_ns": time.monotonic_ns() - started,
+                        "body": data,
+                    },
+                )
+            return data
 
     async def _decide(self, request):
+        self.trace.set(
+            {
+                key: request.get(key)
+                for key in (
+                    "id",
+                    "request_id",
+                    "input_revision",
+                    "revision",
+                    "response_id",
+                    "kinds",
+                )
+            }
+        )
         cfg = self.config["provider"]
         mode = cfg["name"]
         questions = {

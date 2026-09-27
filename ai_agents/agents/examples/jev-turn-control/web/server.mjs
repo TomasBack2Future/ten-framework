@@ -54,7 +54,7 @@ function stop() {
   if (!old) return;
   session = null;
   old.log?.write({ type: "session.ended" });
-  old.log?.close();
+  old.log?.close().catch(() => console.error("JEV_EVIDENCE_CLOSE_FAILED"));
   clearTimeout(old.expiry);
   clearTimeout(old.grace);
   old.client?.close(1000, "Session ended");
@@ -506,6 +506,8 @@ wss.on("connection", (client) => {
           try {
             const message = JSON.parse(data.toString());
             if (message.name === "jev_event") s.log.write(message.data);
+            if (message.type === "audio")
+              s.log.audio("output", message.audio, message.metadata);
           } catch {
             /* Invalid transport data is not recorded. */
           }
@@ -538,6 +540,9 @@ wss.on("connection", (client) => {
       if (++count > 100) throw Error();
       const m = JSON.parse(raw);
       if (!valid(m)) throw Error();
+      if (m.audio) s.log?.audio("input", m.audio, m.metadata);
+      if (m.name === "jev_control")
+        s.log?.write({ type: "client.control", payload: m.data });
       if (m.name === "jev_playback") {
         s.lastPlayback = m.data;
         s.log?.write({

@@ -100,6 +100,29 @@
       },
       {
         "name": "tts_text_result"
+      },
+      {
+        "name": "llm_evidence",
+        "property": {
+          "properties": {
+            "phase": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "wall_time_ns": {
+              "type": "int64"
+            },
+            "monotonic_ns": {
+              "type": "int64"
+            },
+            "body": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
       }
     ],
     "data_out": [
