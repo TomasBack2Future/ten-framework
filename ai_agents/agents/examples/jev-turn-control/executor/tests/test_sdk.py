@@ -100,3 +100,70 @@ class SdkTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(asyncio.CancelledError):
                 await running
         self.assertTrue(interrupted.is_set())
+
+    async def test_sdk_interrupt_failures_preserve_adapter_cancel(self):
+        from unittest.mock import patch
+        from executor.adapter import Executor
+        import tempfile
+
+        for failure in ("timeout", "rpc_error", "context_error"):
+            with self.subTest(failure=failure):
+                entered = asyncio.Event()
+
+                class Handle:
+                    async def run(self):
+                        entered.set()
+                        await asyncio.sleep(100)
+
+                    async def interrupt(self):
+                        if failure == "timeout":
+                            await asyncio.sleep(100)
+                        if failure == "rpc_error":
+                            raise RuntimeError("provider cleanup rejected")
+
+                class Thread:
+                    id = "sdk-review-thread"
+
+                    async def turn(self, *_args, **_kwargs):
+                        return Handle()
+
+                class Client:
+                    async def __aenter__(self):
+                        return self
+
+                    async def __aexit__(self, *_args):
+                        if failure == "context_error":
+                            raise RuntimeError("close failed")
+
+                    async def thread_start(self, **_kwargs):
+                        return Thread()
+
+                with tempfile.TemporaryDirectory() as directory, patch(
+                    "executor.sdk_backend.INTERRUPT_TIMEOUT_SECONDS", 0.01
+                ):
+                    executor = Executor(
+                        CodexBackend(Client),
+                        ExecutorConfig(enabled=True, work_dir=Path(directory)),
+                    )
+                    task = executor.submit(
+                        Request("session", "turn", 1, "make x.txt")
+                    )
+                    await entered.wait()
+                    self.assertEqual(
+                        await executor.cancel("session", task), "cancelled"
+                    )
+                    events = []
+                    while not executor.events.empty():
+                        events.append(executor.events.get_nowait())
+                    terminals = [
+                        e for e in events if e["type"] != "task.started"
+                    ]
+                    self.assertEqual(
+                        [e["type"] for e in terminals], ["task.cancelled"]
+                    )
+                    self.assertEqual(
+                        terminals[0]["payload"]["status"], "cancelled"
+                    )
+                    self.assertEqual(executor.records[task].status, "cancelled")
+                    self.assertEqual(list(Path(directory).rglob("*.txt")), [])
+                    await executor.close()

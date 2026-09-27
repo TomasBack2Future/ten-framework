@@ -16,13 +16,35 @@ from .sandbox import tasks, fixture_plan, verify
 from .sdk_backend import CodexBackend
 
 
+def score_turn(number, dispatched, terminal_success):
+    """Keep filesystem outcome separate from the routing dispatch policy."""
+    expected_dispatch = number == 2
+    policy_success = dispatched == expected_dispatch
+    return {
+        "terminal_state_success": terminal_success,
+        "dispatch_policy_success": policy_success,
+        "unexpected_dispatch": dispatched and not expected_dispatch,
+        "missed_dispatch": expected_dispatch and not dispatched,
+        "success": terminal_success and policy_success,
+    }
+
+
 async def run(args):
     """Identical task prompts/files/backend across all arms; bounded 12 tasks."""
     routing = RoutingConfig(variant="refined", execute_threshold=0.75)
-    routers = {
-        "jev": Router("jev", args.jev_key, routing),
-        "scaledown": Router("scaledown", args.scaledown_key, routing),
-    }
+    cache = {}
+    routers = {}
+    if args.cached_decisions:
+        for line in args.cached_decisions.read_text().splitlines():
+            row = json.loads(line)
+            cache[(row["task"], row["turn"], row["arm"])] = row["decision"]
+    else:
+        if not args.jev_key or not args.scaledown_key:
+            raise ValueError("both provider key files are required")
+        routers = {
+            "jev": Router("jev", args.jev_key, routing),
+            "scaledown": Router("scaledown", args.scaledown_key, routing),
+        }
     rows = []
     with tempfile.TemporaryDirectory() as temporary:
         for task in tasks():
@@ -50,8 +72,19 @@ async def run(args):
                         "stable": True,
                     }
                 }
-                pair = await asyncio.gather(
-                    *(router.classify(sample) for router in routers.values())
+                providers = ("jev", "scaledown")
+                pair = (
+                    [
+                        cache[(task["id"], number, provider)]
+                        for provider in providers
+                    ]
+                    if cache
+                    else await asyncio.gather(
+                        *(
+                            routers[provider].classify(sample)
+                            for provider in providers
+                        )
+                    )
                 )
                 decisions = {
                     "all_accepted": {
@@ -59,7 +92,7 @@ async def run(args):
                         "support": "supported",
                         "latency_ms": 0,
                     },
-                    **dict(zip(routers, pair)),
+                    **dict(zip(providers, pair)),
                 }
                 for arm, decision in decisions.items():
                     root = Path(temporary) / task["id"] / arm / str(number)
@@ -100,6 +133,7 @@ async def run(args):
                                 verify(task, location)
                                 if number == 2 and status == "completed"
                                 else number != 2
+                                and status == "completed"
                                 and not list(location.glob("*"))
                             )
                         except (OSError, ValueError, KeyError):
@@ -112,7 +146,10 @@ async def run(args):
                             "backend": args.backend,
                             "decision": decision,
                             "dispatched": bool(ident),
-                            "success": success,
+                            **score_turn(number, bool(ident), success),
+                            "routing_observation": (
+                                "replayed" if cache else "live"
+                            ),
                             "status": status,
                             "usage": usage,
                             "total_latency_ms": decision["latency_ms"]
@@ -136,8 +173,9 @@ def main():
     """Require explicit backend and keys; no unbounded simulator or retries."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--backend", choices=("fake", "codex"), required=True)
-    parser.add_argument("--jev-key", type=Path, required=True)
-    parser.add_argument("--scaledown-key", type=Path, required=True)
+    parser.add_argument("--jev-key", type=Path)
+    parser.add_argument("--scaledown-key", type=Path)
+    parser.add_argument("--cached-decisions", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():

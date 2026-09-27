@@ -1,25 +1,35 @@
 {
-  "authored_license": "Independently authored pilot fixtures; repository/example license applies. No upstream text vendored.",
-  "files": {
-    "results/ablation-fake.jsonl": "c8d0a824780c534cfe98d815463aba1fb7a76d955e29095324ac3270d766111d",
-    "results/codex-probe.json": "15926aefd174110e0b2bf94c02a0af99c84fc2b8cd695d39b1d3f02c0b2e69f3",
-    "results/dev-baseline.jsonl": "b4938dc4faef1d36164a507479d5d49882f81af262940afcfa02a21ed6ca2a91",
-    "results/dev-baseline.summary.json": "498dc4d0002b6be5aeb2aa9f3239ddf2bc2d7323036f41f2364262c5fd801e9f",
-    "results/dev-refined.jsonl": "6d375456563e36a058c1381ce04a8a3535e5a5545e34e7304673269911965b5a",
-    "results/dev-refined.summary.json": "dedb254fd8ad0c719259823812e8f86a2f23f721690559cefa41ec79c3651c4f",
-    "results/locked-test.jsonl": "cd6cdf7e98a8a314882edcb4e5bc944a3f10d53aa2679040ae0706d8e4e071bb",
-    "results/locked-test.summary.json": "fc973963a1175de0903aa9b0495ce38b1c8702d324a911cb10cbfedcee43a1bf",
-    "results/sandbox-fake.jsonl": "c05e74dc47998ff73d9d96eb11bc242b06cd6c5870e1e3cffb698f5f5d93da4f",
-    "results/selection-lock.json": "0dd60de524119cde54ac276588292fda749d70086bcc1a38b13e475c7fd08317",
-    "results/streaming-fake.json": "012d733b7bd84c4b35a8e104f2e8e98b2b54d9f010086d5e5e27092f932d9b0c"
-  },
-  "routing_samples": 80,
-  "authored_samples": 64,
-  "bfcl_samples": 16,
-  "sandbox_tasks": 12,
+  "evaluation_boundary": "exposed-regression",
+  "samples": 80,
+  "source_scripts": 32,
+  "authored_semantic_families": 17,
   "split_counts": {
-    "train": 24,
-    "dev": 30,
-    "locked-test": 26
+    "train": 28,
+    "dev": 22,
+    "regression-test": 30
+  },
+  "historical_holdout_claim": "withdrawn_semantic_family_leakage",
+  "files": {
+    "results/ablation-replay-corrected.jsonl": "5a9b6e6ec64a8dd0a4db184cfdb10a4f8e31609db4b039bdaed7bef815ddcc1f",
+    "results/historical-v1/REPORT.md": "3ec3296d3ec271a195f3ee92650b3e080dcf3d9e0311f8573fcb05ab9bb2f615",
+    "results/historical-v1/ablation-fake.jsonl": "c8d0a824780c534cfe98d815463aba1fb7a76d955e29095324ac3270d766111d",
+    "results/historical-v1/codex-probe.json": "15926aefd174110e0b2bf94c02a0af99c84fc2b8cd695d39b1d3f02c0b2e69f3",
+    "results/historical-v1/dev-baseline.jsonl": "b4938dc4faef1d36164a507479d5d49882f81af262940afcfa02a21ed6ca2a91",
+    "results/historical-v1/dev-baseline.summary.json": "498dc4d0002b6be5aeb2aa9f3239ddf2bc2d7323036f41f2364262c5fd801e9f",
+    "results/historical-v1/dev-refined.jsonl": "6d375456563e36a058c1381ce04a8a3535e5a5545e34e7304673269911965b5a",
+    "results/historical-v1/dev-refined.summary.json": "dedb254fd8ad0c719259823812e8f86a2f23f721690559cefa41ec79c3651c4f",
+    "results/historical-v1/locked-test.jsonl": "cd6cdf7e98a8a314882edcb4e5bc944a3f10d53aa2679040ae0706d8e4e071bb",
+    "results/historical-v1/locked-test.summary.json": "fc973963a1175de0903aa9b0495ce38b1c8702d324a911cb10cbfedcee43a1bf",
+    "results/historical-v1/sandbox-fake.jsonl": "c05e74dc47998ff73d9d96eb11bc242b06cd6c5870e1e3cffb698f5f5d93da4f",
+    "results/historical-v1/selection-lock.json": "0dd60de524119cde54ac276588292fda749d70086bcc1a38b13e475c7fd08317",
+    "results/historical-v1/streaming-fake.json": "012d733b7bd84c4b35a8e104f2e8e98b2b54d9f010086d5e5e27092f932d9b0c",
+    "results/regression-paired.jsonl": "9daabd59b9882a7ae15726eb13cb6b85b8bee9ab9ba837e87e176ae68f52ab0a",
+    "results/regression-paired.summary.json": "f9d5470f86ea78dac589457c0860767df30fca3f11ae53a382c025932408fb69",
+    "results/regression-selection.json": "ec501ad13ef3d7f29b6e202107bac701353b19ba4bc82850b15cf7557ee3aea1",
+    "results/review-validation.json": "9e68c69f24da8126cc218049633539c4551b35aab852921a86f6ba2717927169",
+    "results/sandbox-fake.jsonl": "347b2e290a0f10bd5ae4c62335e929d73c8ce915ba8b17123f16d92a96816342",
+    "results/streaming-fake.json": "eb1ebadcda8c271d3dc8f01623e2bdec6e0c0bd533d1d1c0f5ec52cbce236b1c",
+    "results/regression-selection.v2.json": "9ec8205c9f1836c92812f4bc82ce539efb999c34b6c9129af565e15ad5c66213",
+    "results/spec-lock-validation.json": "c3c95a1fb73ac61741e93aac4613842a396950b020a5293454f9c1b1284a0f08"
   }
 }

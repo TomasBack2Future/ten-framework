@@ -3,6 +3,7 @@
 # pylint: disable=line-too-long  # Preserve explicit benchmark/prompt text.
 
 import asyncio
+import hashlib
 import json
 import math
 import time
@@ -29,16 +30,116 @@ REFINED = (
 )
 
 
-def model_input(sample):
+JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
+SCALEDOWN_ENDPOINT = "https://api.scaledown.xyz/classify"
+INPUT_PROJECTION = [
+    ("text", ""),
+    ("history", []),
+    ("active_tasks", []),
+    ("capabilities", []),
+    ("stable", True),
+]
+SCALEDOWN_MULTI_LABEL = False
+
+
+def decision_spec(config):
+    """Canonical, credential-free spec used both to lock and build requests.
+
+    ScaleDown receives no model/compression selector. Its resolved server model
+    and compression behavior are unknown, not an inferred or pinned model ID.
+    """
+    prompt = config.prompt_override or (
+        REFINED if config.variant == "refined" else BASELINE
+    )
+    questions = [("route", ROUTES), ("support", SUPPORT)]
+    spec = {
+        "schema_version": 1,
+        "input_projection": INPUT_PROJECTION,
+        "providers": {
+            "jev": {
+                "endpoint": JEV_ENDPOINT,
+                "model_selection": {
+                    "mode": "explicit_request",
+                    "id": config.model,
+                },
+                "compression": {"client": "none", "server": "unknown"},
+                "request": {
+                    "model": config.model,
+                    "questions": {
+                        name: {
+                            "type": "choice",
+                            "instructions": prompt,
+                            "criteria": labels,
+                        }
+                        for name, labels in questions
+                    },
+                },
+                "question_dispatch": "one_request",
+            },
+            "scaledown": {
+                "endpoint": SCALEDOWN_ENDPOINT,
+                "model_selection": {
+                    "mode": "omitted_provider_default",
+                    "resolved_id": None,
+                },
+                "compression": {
+                    "client": "none",
+                    "request_selector": "omitted",
+                    "server": "unknown",
+                },
+                "requests": [
+                    {
+                        "question": name,
+                        "body": {
+                            "multi_label": SCALEDOWN_MULTI_LABEL,
+                            "labels": [
+                                {"name": key, "rubric": prompt + " " + rubric}
+                                for key, rubric in labels.items()
+                            ],
+                        },
+                    }
+                    for name, labels in questions
+                ],
+                "text_serialization": {"ensure_ascii": False},
+                "question_dispatch": "concurrent_requests",
+            },
+        },
+        "decision_policy": {
+            "variant": config.variant,
+            "question_order": [name for name, _ in questions],
+            "label_order": {name: list(labels) for name, labels in questions},
+            "selection": "argmax_first_label_on_tie",
+            "execute_threshold": config.execute_threshold,
+            "below_threshold_route": "clarify",
+        },
+        "transport": {
+            "timeout_seconds": config.timeout,
+            "automatic_retries": 0,
+        },
+    }
+    # Detach mutable rubric/default dictionaries from the in-flight snapshot.
+    return json.loads(json.dumps(spec, allow_nan=False))
+
+
+def spec_sha256(spec):
+    """Hash semantic values canonically; explicit order arrays preserve order."""
+    return hashlib.sha256(
+        json.dumps(
+            spec,
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode()
+    ).hexdigest()
+
+
+def model_input(sample, projection=None):
     """Explicit whitelist excludes source IDs, future turns, gold and private goals."""
     return {
-        k: sample["input"].get(k, default)
-        for k, default in (
-            ("text", ""),
-            ("history", []),
-            ("active_tasks", []),
-            ("capabilities", []),
-            ("stable", True),
+        key: sample["input"].get(key, default)
+        for key, default in (
+            INPUT_PROJECTION if projection is None else projection
         )
     }
 
@@ -68,77 +169,85 @@ def _scores(raw, keys):
 class Router:
     """Credentials are read only in server memory and never returned/logged."""
 
-    def __init__(self, provider, key_file, config=None):
+    def __init__(
+        self, provider, key_file, config=None, expected_spec_sha256=None
+    ):
         self.provider = provider
-        self.key = Path(key_file).read_text(encoding="utf-8").strip()
         self.config = config or RoutingConfig()
+        self.spec = decision_spec(self.config)
+        self.spec_digest = spec_sha256(self.spec)
+        if (
+            expected_spec_sha256 is not None
+            and self.spec_digest != expected_spec_sha256
+        ):
+            raise ValueError(
+                "decision spec changed before provider construction"
+            )
+        self.key = Path(key_file).read_text(encoding="utf-8").strip()
 
     async def classify(self, sample):
-        """Return route/support scores and full paired-question latency."""
-        config = self.config
-        prompt = config.prompt_override or (
-            REFINED if config.variant == "refined" else BASELINE
-        )
-        state = model_input(sample)
+        """Use the same frozen spec that is fingerprinted in the selection lock."""
+        spec = self.spec
+        state = model_input(sample, spec["input_projection"])
+        provider = spec["providers"][self.provider]
+        policy = spec["decision_policy"]
+        timeout = spec["transport"]["timeout_seconds"]
         start = time.monotonic()
         if self.provider == "jev":
+            request = provider["request"]
             response = await asyncio.to_thread(
                 _post,
-                "https://api.typesafe.ai/v1/systemone",
+                provider["endpoint"],
                 {
-                    "model": config.model,
+                    "model": request["model"],
                     "state": state,
-                    "questions": {
-                        name: {
-                            "type": "choice",
-                            "instructions": prompt,
-                            "criteria": labels,
-                        }
-                        for name, labels in (
-                            ("route", ROUTES),
-                            ("support", SUPPORT),
-                        )
-                    },
+                    "questions": request["questions"],
                 },
                 {"Authorization": "Bearer " + self.key},
-                config.timeout,
+                timeout,
             )
             scores = [
-                _scores(response["answers"][k]["probabilities"], labels)
-                for k, labels in (("route", ROUTES), ("support", SUPPORT))
+                _scores(
+                    response["answers"][name]["probabilities"],
+                    policy["label_order"][name],
+                )
+                for name in policy["question_order"]
             ]
             usage = response.get("usage", {})
         elif self.provider == "scaledown":
 
-            async def question(labels):
+            async def question(request):
                 response = await asyncio.to_thread(
                     _post,
-                    "https://api.scaledown.xyz/classify",
+                    provider["endpoint"],
                     {
-                        "text": json.dumps(state, ensure_ascii=False),
-                        "multi_label": False,
-                        "labels": [
-                            {"name": k, "rubric": prompt + " " + v}
-                            for k, v in labels.items()
-                        ],
+                        "text": json.dumps(
+                            state, **provider["text_serialization"]
+                        ),
+                        **request["body"],
                     },
                     {"x-api-key": self.key},
-                    config.timeout,
+                    timeout,
                 )
                 raw = response.get("scores")
                 if raw is None:
                     raw = response["results"][0]["scores"]
-                return _scores(raw, labels)
+                return _scores(raw, policy["label_order"][request["question"]])
 
-            scores = await asyncio.gather(question(ROUTES), question(SUPPORT))
+            scores = await asyncio.gather(
+                *(question(request) for request in provider["requests"])
+            )
             usage = {}  # Provider omits token usage; never invent dollar costs.
         else:
             raise ValueError("unknown provider")
         route = max(scores[0], key=scores[0].get)
         support = max(scores[1], key=scores[1].get)
         gated = route
-        if route == "execute" and scores[0][route] < config.execute_threshold:
-            gated = "clarify"
+        if (
+            route == "execute"
+            and scores[0][route] < policy["execute_threshold"]
+        ):
+            gated = policy["below_threshold_route"]
         return {
             "route": gated,
             "raw_route": route,
@@ -149,6 +258,10 @@ class Router:
             "usage": usage,
             "cost_usd": None,
             "provider": self.provider,
-            "variant": config.variant,
-            "execute_threshold": config.execute_threshold,
+            "variant": policy["variant"],
+            "execute_threshold": policy["execute_threshold"],
+            "decision_spec_schema_version": spec["schema_version"],
+            "decision_spec_sha256": self.spec_digest,
+            "provider_model_selection": provider["model_selection"],
+            "provider_compression": provider["compression"],
         }

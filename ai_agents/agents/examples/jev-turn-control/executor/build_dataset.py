@@ -278,13 +278,40 @@ PAIRS = [
 ]
 
 
+# Audit explicit translation/semantic families before assigning any split.
+FAMILY_ALIASES = {
+    "speech_vs_task": "speech_and_cancellation",
+    "stop_reading": "speech_and_cancellation",
+    "speech_keep": "speech_and_cancellation",
+    "task_pause": "speech_and_cancellation",
+    "cancel_context": "speech_and_cancellation",
+    "task_cancel_negated": "speech_and_cancellation",
+    "conditional": "conditional",
+    "hypothetical_en": "conditional",
+    "negation": "negation",
+    "negation_en": "negation",
+    "partial_rewrite": "negation",
+    "quotation": "quotation",
+    "quoted_en": "quotation",
+    "task_quote": "quotation",
+    "status_context": "task_progress",
+    "progress": "task_progress",
+    "task_status_en": "task_progress",
+    "missing_filename": "missing_reference",
+    "partial_object": "missing_reference",
+    "chitchat": "social",
+    "thanks": "social",
+    "greeting": "social",
+}
+
+
 def split(family):
     """Deterministic family-level allocation; no downstream label-based split."""
     bucket = (
         int(hashlib.sha256(("20260927:" + family).encode()).hexdigest()[:8], 16)
         % 10
     )
-    return "train" if bucket < 3 else "dev" if bucket < 7 else "locked-test"
+    return "train" if bucket < 3 else "dev" if bucket < 7 else "regression-test"
 
 
 def authored():
@@ -302,8 +329,10 @@ def authored():
             rows.append(
                 {
                     "id": f"self:{family}:{index}",
-                    "family": family,
-                    "split": split(family),
+                    "family": FAMILY_ALIASES.get(family, family),
+                    "source_family": family,
+                    "split": split(FAMILY_ALIASES.get(family, family)),
+                    "evaluation_boundary": "exposed-regression",
                     "kind": "self_authored",
                     "source_id": f"jev-pilot:{family}",
                     "input": {
@@ -414,7 +443,9 @@ def public_rows(cache):
                 "source_id": source["id"],
                 "family": family,
                 "kind": "public_derived" if derived else "public_original",
-                "split": "locked-test",
+                "split": "regression-test",
+                "evaluation_boundary": "exposed-regression",
+                "upstream_role": "evaluation",
                 "input": {
                     "text": text,
                     "history": history,
@@ -433,7 +464,9 @@ def public_rows(cache):
                 "turn": turn,
                 "category": category,
                 "family": family,
-                "split": "locked-test",
+                "split": "regression-test",
+                "evaluation_boundary": "exposed-regression",
+                "upstream_role": "evaluation",
                 "kind": rows[-1]["kind"],
                 "gold": rows[-1]["gold"],
                 "rationale": rationale,

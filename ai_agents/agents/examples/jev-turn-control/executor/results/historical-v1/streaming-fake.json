@@ -1,11 +1,11 @@
 {
   "backend": "fake_fixture",
   "duplicate_executions": 0,
-  "cancel_latency_ms": 0.11349993292242289,
+  "cancel_latency_ms": 0.14108407776802778,
   "stale_artifact_commits": 0,
   "stop_speech_preserves_task": true,
-  "first_feedback_ms": 0.4011249402537942,
-  "completion_ms": 52.68849991261959,
+  "first_feedback_ms": 0.39316690526902676,
+  "completion_ms": 52.13883297983557,
   "audio_stop_latency_ms": null,
   "note": "Task metrics only; no TTS/audio timing claim"
 }

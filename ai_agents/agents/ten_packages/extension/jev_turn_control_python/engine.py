@@ -28,7 +28,9 @@ class TurnEngine:
         self.last_input = 0
         self.last_request = -100000
         self.inflight = None
+        self.request_seq = 0
         self.last_decided = -1
+        self.last_decided_speaking = None
         self.timer = None
         self.timer_seq = 0
         self.active = None
@@ -46,7 +48,9 @@ class TurnEngine:
         self.last_backchannel = -100000
         self.closed = False
         self.paused = False
+        self.paused_timer = None
         self.failed = False
+        self.guidance_sent = False
 
     def emit(self, kind, payload=None, response_id=None):
         self.seq += 1
@@ -118,7 +122,7 @@ class TurnEngine:
         if self.closed or not text.strip():
             return
         self.now = now
-        text = text[:12000]
+        text = " ".join(text[:12000].split())
         # A repeated final for the partial already used to answer is not a new turn.
         if segment_id == self.consumed_segment and text == self.consumed_text:
             return
@@ -156,12 +160,21 @@ class TurnEngine:
         self.cancel_timer("replaced")
         self.timer_seq += 1
         delay = 0 if immediate else self.config["wait"][label + "_ms"]
+        # A continuation is a hold, not a request to clarify. Only sustained
+        # silence can exhaust it; ongoing ASR must never exhaust a turn budget.
+        if label == "continuation":
+            delay = max(
+                0,
+                self.last_input
+                + self.config["scheduling"]["max_wait_ms"]
+                - self.now,
+            )
         self.timer = {
             "timer_id": self.timer_seq,
             "label": label,
             "due_ms": min(
                 self.now + delay,
-                self.first_input + self.config["scheduling"]["max_wait_ms"],
+                self.last_input + self.config["scheduling"]["max_wait_ms"],
             ),
             "input_revision": self.revision,
             "epoch": self.epoch,
@@ -170,36 +183,52 @@ class TurnEngine:
 
     def begin_decision(self, now):
         self.now = now
-        if self.closed or self.paused or not self.pending or self.inflight:
+        if (
+            self.closed
+            or self.paused
+            or not self.pending
+            or self.inflight
+            or self.stopping
+        ):
             return None
         cfg = self.config["scheduling"]
+        speaking = bool(self.active)
         if (
             self.revision == self.last_decided
-            or now - self.last_request < cfg["min_interval_ms"]
-        ):
+            and speaking == self.last_decided_speaking
+        ) or now - self.last_request < cfg["min_interval_ms"]:
             return None
-        # Debounce has a hard maximum: never reset it for every partial.
-        if (
-            now - self.last_input < cfg["merge_ms"]
-            and now
-            - (
-                self.last_request
-                if self.last_request >= 0
-                else self.first_input
-            )
-            < cfg["min_interval_ms"] + cfg["merge_ms"]
-        ):
+        quiet_ms = now - self.last_input
+        if speaking:
+            # Stop decisions retain the bounded debounce: continuous speech
+            # cannot starve interruption. No speculative start request is needed
+            # until playback releases the floor.
+            elapsed = now - max(self.first_input, self.last_request)
+            if (
+                quiet_ms < cfg["merge_ms"]
+                and elapsed < cfg["min_interval_ms"] + cfg["merge_ms"]
+            ):
+                return None
+        elif quiet_ms < max(cfg["merge_ms"], cfg["min_interval_ms"]):
+            # Listening can wait for a stable partial. The previous hard bound
+            # sent requests immediately after fresh speech whenever the prior
+            # request was old, wasting calls on rapidly changing prefixes.
             return None
         if not self.config["turn"]["enabled"]:
             return None
-        kinds = [
-            k
-            for k in ("stop", "start", "backchannel")
-            if self.config[k]["enabled"] and (k != "stop" or self.active)
-        ]
+        candidates = ("start", "backchannel")
+        if speaking:
+            candidates = (
+                ("stop", "start")
+                if self.responses[self.active]["mode"] == "backchannel"
+                else ("stop",)
+            )
+        kinds = [k for k in candidates if self.config[k]["enabled"]]
         if not kinds:
             return None
+        self.request_seq += 1
         request = {
+            "request_id": self.request_seq,
             "revision": self.revision,
             "epoch": self.epoch,
             "started_ms": now,
@@ -230,7 +259,10 @@ class TurnEngine:
 
     def complete_decision(self, request, answers, now, error=None):
         self.now = now
-        if self.inflight != request:
+        if (
+            self.inflight is None
+            or request.get("request_id") != self.inflight["request_id"]
+        ):
             return
         self.inflight = None
         stale = (
@@ -268,6 +300,7 @@ class TurnEngine:
         if stale:
             return
         self.last_decided = self.revision
+        self.last_decided_speaking = request["state"]["assistant_speaking"]
         if error:
             self.failed = True
             self.emit(
@@ -286,6 +319,27 @@ class TurnEngine:
             return
         start = answers.get("start", {})
         label = start.get("label")
+        score = start.get("score", 0)
+        # Answer and clarify both grant the assistant the floor. For a stable
+        # final segment, uncertainty between those two must not turn a complete
+        # short answer into a five-second hold. Final alone grants nothing.
+        probabilities = start.get("probabilities", {})
+        reply_score = probabilities.get("answer", 0) + probabilities.get(
+            "clarify", 0
+        )
+        if (
+            self.final
+            and label not in ("explicit_wait", "ignore")
+            and score < self.config["start"]["threshold"]
+            and reply_score >= self.config["start"]["threshold"]
+        ):
+            label = (
+                "answer"
+                if probabilities.get("answer", 0)
+                > probabilities.get("clarify", 0)
+                else "clarify"
+            )
+            score = reply_score
         if label in (
             "answer",
             "clarify",
@@ -293,14 +347,19 @@ class TurnEngine:
             "explicit_wait",
             "ignore",
         ):
-            if start.get("score", 0) >= self.config["start"]["threshold"]:
-                self.mark_applied("start")
+            if score >= self.config["start"]["threshold"] or label in (
+                "explicit_wait",
+                "ignore",
+            ):
+                self.mark_applied(
+                    "start", effective_label=label, effective_score=score
+                )
                 self.schedule(label)
         bc = answers.get("backchannel", {})
         if (
             not self.active
             and not self.stopping
-            and label not in ("answer", "clarify")
+            and label == "continuation"
             and bc.get("label") == "backchannel"
             and bc.get("score", 0) >= self.config["backchannel"]["threshold"]
             and now - request["started_ms"]
@@ -312,7 +371,7 @@ class TurnEngine:
             self.last_backchannel = now
             self.start("backchannel")
 
-    def mark_applied(self, kind):
+    def mark_applied(self, kind, **details):
         for event in reversed(self.events):
             if (
                 event["type"] == "decision.completed"
@@ -320,6 +379,7 @@ class TurnEngine:
                 and event["payload"]["decision_kind"] == kind
             ):
                 event["payload"]["applied"] = True
+                event["payload"].update(details)
                 break
 
     def tick(self, now):
@@ -333,7 +393,7 @@ class TurnEngine:
             and self.config["start"]["enabled"]
             and self.timer
             and now >= self.timer["due_ms"]
-            and self.timer["label"] != "ignore"
+            and self.timer["label"] in ("answer", "clarify")
         ):
             label = self.timer["label"]
             self.stop("main_response_priority")
@@ -367,12 +427,15 @@ class TurnEngine:
         if self.failed and self.config["provider"]["failure_policy"] == "hold":
             return
         maximum = (
-            now >= self.first_input + self.config["scheduling"]["max_wait_ms"]
+            now >= self.last_input + self.config["scheduling"]["max_wait_ms"]
         )
         due = self.timer and now >= self.timer["due_ms"]
         if not maximum and not due:
             return
         label = self.timer["label"] if self.timer else "clarify"
+        guidance = label == "continuation" or (maximum and not due)
+        if guidance and self.guidance_sent:
+            return
         if due:
             self.emit("timer.fired", self.timer)
         else:
@@ -380,14 +443,18 @@ class TurnEngine:
                 "timer.fired",
                 {
                     "label": "maximum_wait",
-                    "due_ms": self.first_input
+                    "due_ms": self.last_input
                     + self.config["scheduling"]["max_wait_ms"],
                 },
             )
         self.timer = None
-        if label == "ignore":
+        if label in ("ignore", "explicit_wait"):
             self.pending = False
             return
+        if guidance:
+            self.guidance_sent = True
+        else:
+            self.guidance_sent = False
         self.start("answer" if label == "answer" else "clarify")
 
     def start(self, mode):
@@ -822,6 +889,13 @@ class TurnEngine:
 
     def pause(self, now):
         self.now = now
+        if self.paused:
+            return
+        self.paused_timer = deepcopy(self.timer)
+        if self.paused_timer:
+            self.paused_timer["remaining_ms"] = max(
+                0, self.paused_timer["due_ms"] - now
+            )
         self.paused = True
         self.epoch += 1
         self.cancel_timer("paused")
@@ -830,8 +904,27 @@ class TurnEngine:
 
     def resume(self, now):
         self.now = now
+        if not self.paused:
+            return
         self.paused = False
-        self.last_decided = -1
+        self.last_input = now
+        self.first_input = now
+        if (
+            self.paused_timer
+            and self.paused_timer["input_revision"] == self.revision
+        ):
+            self.timer_seq += 1
+            self.timer = {
+                **self.paused_timer,
+                "timer_id": self.timer_seq,
+                "due_ms": now + self.paused_timer["remaining_ms"],
+                "epoch": self.epoch,
+            }
+            del self.timer["remaining_ms"]
+            self.emit("timer.scheduled", self.timer)
+        else:
+            self.last_decided = -1
+        self.paused_timer = None
         self.snapshot()
 
     def close(self, now):
