@@ -1,0 +1,34 @@
+{
+  "base_sha": "5ed692cf78bde417c553b8e798e13d647afcd29c",
+  "cases": 219,
+  "families": 126,
+  "case_cohorts": {
+    "prior_six_decision": 63,
+    "authored_synthetic": 96,
+    "public_reference_projection": 60
+  },
+  "gold_decisions": 257,
+  "cold_cases": 20,
+  "jobs": 853,
+  "arm_results": 3256,
+  "expected_http_without_failures": 4109,
+  "data_sha256": "1b2e48672cb3b1e093ee0430e63f10e52c08532c59184b8c323915494aa9a042",
+  "jobs_sha256": "ae2588f341f5152ecb2b59b60388c3ff06d288507f309080aed442c3854fab28",
+  "profiles_sha256": "42072fcd5a913008906c4ef156cea3f7a0202142327128e7e1ad2509938d62f0",
+  "tuning": "none; all examples previously seen; no new holdout/production accuracy claim",
+  "concurrency": 2,
+  "timeout_seconds": 12,
+  "runtime_deadline_ms": 800,
+  "provider_dedicated": "provider reported enablement; not independently verified or isolated causally",
+  "arms": [
+    "jev",
+    "sd reasoning=false",
+    "sd_jev compression then Jev",
+    "sd reasoning=true control"
+  ],
+  "wire_change": "reasoning=false ONLY in SD classify body; no unverified field added to compression or Jev",
+  "primary_comparison": "controlled: same current Jev questions, same current Jev gate policy; exact choice and binary floor scores separately",
+  "secondary": "shipped_profile: each current mode questions/thresholds on same 156 binary floor states, one pass; prompt differences explicitly retained",
+  "repeats": "3 warm per primary case, 2 cold per frozen subset; repeated trials clustered by family for confidence intervals",
+  "raw_evidence": "actual body,response text,model,latency,HTTP errors,reasoning field paths+length retained; no credentials"
+}

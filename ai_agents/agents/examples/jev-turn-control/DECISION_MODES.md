@@ -9,7 +9,9 @@ uses `mock`.
 
 - `jev`: original structured state → Jev `jev-1.13.0`.
 - `sd`: the same structured state serialized into `state.text` → ScaleDown
-  `/v1/scaledown`, model `classify-1`, with the same choice-question contract.
+  `/v1/scaledown`, model `classify-1`, with `reasoning: false` and the same
+  choice-question contract. Reasoning text is not needed by the decision
+  reducer, so the client explicitly requests classification without it.
 - `sd_jev`: state → ScaleDown `/compress/raw/` → Jev with
   `state.compressed_state_text`. Compression preserves the decision definitions,
   speaker attribution, user prefix and negation. Its backend revision is not
@@ -28,8 +30,7 @@ JEV_SESSION_CONFIG='{"provider.name":"sd_jev","provider.profile":"tuned"}' \
 
 `provider.profile=tuned` is the default candidate. `baseline` preserves the
 original voice prompts, criteria, thresholds, `jev-latest` selection and legacy
-combined-readiness rule for reproducing b09 behavior. The default Jev candidate
-uses top-label scoring, not combined readiness. SD candidates combine
+combined-readiness rule for reproducing b09 behavior. The current Jev and SD candidates combine
 P(answer)+P(clarify) only when the chosen label is answer or clarify; they retain
 that chosen subcategory and never promote continuation based on combined mass.
 Low-confidence results do not schedule a reply. Existing maximum-wait and stop
@@ -37,7 +38,7 @@ fallback behavior remains in the reducer, including its `hold` failure policy.
 
 | Decision | Jev | SD | SD → Jev |
 | --- | ---: | ---: | ---: |
-| Start | .47 (top) | .95 (answer + clarify) | .54 (answer + clarify) |
+| Start | .47 (answer + clarify) | .95 (answer + clarify) | .54 (answer + clarify) |
 | Stop | .65 | .49 | .65 |
 | Backchannel | .71 | .62 | .74 |
 | Memory compression decision | .70 | .70 | .70 |
@@ -136,3 +137,17 @@ regressions exercise the operator gate for all six combinations. Local integrate
 TEN tests: **109 passed, 14 subtests passed**; Web: **19 passed**. The historical
 khipaa artifact above identifies the initial source hashes and is not presented
 as a fresh network measurement of this integrated tree.
+
+## Reasoning-off / dedicated-era khipaa remeasurement
+
+The [paired benchmark](validation/scaledown-reasoning-20260927/REPORT.md) uses
+current questions and retains three warm repetitions on 219 seen regression
+inputs. Warm P50/P95: Jev 95/140 ms, SD with `reasoning: false` 262/409 ms,
+SD compression → Jev 216/276 ms. These are complete API-chain latencies, not
+voice-turn latency. Accuracy denominators, current-profile checks, cold requests
+and family uncertainty are reported separately.
+
+An explicit `reasoning: true` control returned no reasoning field either and
+showed no clear latency difference. Sending `false` is verified; server-side
+flag behavior and the provider-reported dedicated routing are not independently
+confirmed. The default remains Jev.

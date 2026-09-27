@@ -105,11 +105,13 @@ def test_modes_send_complete_selected_questions_and_reuse_client(
         if mode == "sd":
             assert final_url.endswith("/v1/scaledown")
             assert body["model"] == "classify-1"
+            assert body["reasoning"] is False
             assert json.loads(body["state"]["text"]) == state
             assert call["headers"] == {"x-api-key": "test-sd"}
         else:
             assert final_url.endswith("/v1/systemone")
             assert body["model"] == "jev-1.13.0"
+            assert "reasoning" not in body
             assert call["headers"] == {"Authorization": "Bearer test-jev"}
             assert body["state"] == (
                 state
@@ -118,6 +120,7 @@ def test_modes_send_complete_selected_questions_and_reuse_client(
             )
         if mode == "sd_jev":
             compression = client.calls[0][1]
+            assert "reasoning" not in compression["json"]
             assert json.loads(compression["json"]["context"]) == state
             assert compression["headers"] == {"x-api-key": "test-sd"}
             assert "user prefix" in compression["json"]["prompt"]
