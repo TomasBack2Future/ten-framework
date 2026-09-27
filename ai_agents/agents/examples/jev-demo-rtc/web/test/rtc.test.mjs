@@ -72,8 +72,16 @@ test("joins matching identity, filters remote UID, publishes mic and renews toke
   await s.handlers["token-privilege-did-expire"]();
   assert.equal(
     s.calls.filter((c) => c[0] === "renew" && c[1] === "new").length,
-    2,
+    1,
   );
+  assert.deepEqual(s.calls.filter((c) => c[0] === "join").at(-1), [
+    "join",
+    "app",
+    "channel",
+    "new",
+    1001,
+  ]);
+  assert.equal(s.calls.filter((c) => c[0] === "publish").length, 2);
 });
 
 test("unpublish ends old track; next publish resumes; output mute waits for next reply", async () => {
@@ -145,4 +153,39 @@ test("late subscribe after unpublish does not replay an obsolete track", async (
   release();
   await pending;
   assert.equal(s.calls.filter((c) => c[0] === "play").length, 0);
+});
+
+test("expired-token recovery cannot rejoin after session cleanup", async () => {
+  const s = setup();
+  let release;
+  await s.rtc.prepare();
+  await s.rtc.join(credentials);
+  s.rtc.fetchToken = () =>
+    new Promise((resolve) => {
+      release = resolve;
+    });
+  const renewal = s.handlers["token-privilege-did-expire"]();
+  await new Promise((resolve) => setImmediate(resolve));
+  await s.rtc.destroy();
+  release({ token: "late" });
+  await renewal;
+  assert.equal(s.calls.filter((c) => c[0] === "join").length, 1);
+  assert.equal(s.calls.filter((c) => c[0] === "publish").length, 1);
+});
+
+test("failed expired-token recovery closes the microphone and reports failure", async () => {
+  const s = setup();
+  await s.rtc.prepare();
+  await s.rtc.join(credentials);
+  s.rtc.fetchToken = async () => {
+    throw Error("session expired");
+  };
+  await s.handlers["token-privilege-did-expire"]();
+  assert.equal(s.errors[0].message, "session expired");
+  assert.equal(s.rtc.local, null);
+  assert.deepEqual(s.calls.slice(-3), [
+    ["local-stop"],
+    ["local-close"],
+    ["leave"],
+  ]);
 });

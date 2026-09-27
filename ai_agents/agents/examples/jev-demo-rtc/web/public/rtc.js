@@ -34,7 +34,8 @@ export class RTCConnection {
     const client = this.sdk.createClient({ mode: "live", codec: "vp8" });
     this.client = client;
     const current = () => epoch === this.epoch && this.client === client;
-    let publication = 0;
+    let publication = 0,
+      rejoining = false;
     const guard =
       (fn) =>
       (...args) =>
@@ -70,15 +71,49 @@ export class RTCConnection {
       }),
     );
     const renew = guard(async () => {
+      if (rejoining) return;
       const next = await this.fetchToken();
-      if (current()) await client.renewToken(next.token);
+      if (current() && !rejoining) await client.renewToken(next.token);
     });
     client.on("token-privilege-will-expire", renew);
-    client.on("token-privilege-did-expire", renew);
+    client.on(
+      "token-privilege-did-expire",
+      guard(async () => {
+        if (rejoining) return;
+        rejoining = true;
+        publication++;
+        this.remote?.stop();
+        this.remote = null;
+        try {
+          const next = await this.fetchToken();
+          if (!current()) return;
+          await client.leave();
+          if (!current()) return;
+          await client.join(
+            credentials.app_id,
+            credentials.channel,
+            next.token,
+            credentials.uid,
+          );
+          if (!current()) {
+            await client.leave();
+            return;
+          }
+          await client.publish([this.local]);
+        } catch (error) {
+          if (current()) {
+            this.onError(error);
+            await this.destroy();
+          }
+        } finally {
+          rejoining = false;
+        }
+      }),
+    );
     client.on(
       "connection-state-change",
       guard((state) => {
-        if (state === "DISCONNECTED")
+        if (state === "DISCONNECTED" && !rejoining)
           this.onError(
             Error("RTC disconnected; end this session and reconnect"),
           );
