@@ -96,6 +96,7 @@ function apply(e) {
           : JSON.stringify(p.heard_context);
     return;
   }
+  if (e.type === "response.text") $("subtitle").textContent = p.text || "";
   if (e.type === "asr.updated") {
     $("transcript").textContent = p.text || "";
     $("subtitle").textContent = p.text || "Listening…";

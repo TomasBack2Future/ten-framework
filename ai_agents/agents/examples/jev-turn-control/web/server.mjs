@@ -422,6 +422,36 @@ wss.on("connection", (client) => {
       )
         throw Error();
       if (s.worker) {
+        if (
+          mode === "mock" &&
+          m.name === "jev_control" &&
+          m.data.action === "replay"
+        ) {
+          for (const timer of s.timers) clearTimeout(timer);
+          const replayId = randomBytes(4).toString("hex");
+          s.timers = [
+            [0, "What is the weather?", false, "one"],
+            [180, "What is the weather?", true, "one"],
+            [1400, "Wait, I meant tomorrow.", false, "two"],
+            [1600, "Wait, I meant tomorrow.", true, "two"],
+          ].map(([delay, text, final, segment]) =>
+            setTimeout(() => {
+              if (session === s && s.upstream?.readyState === 1)
+                s.upstream.send(
+                  JSON.stringify({
+                    type: "data",
+                    name: "jev_asr",
+                    data: {
+                      text,
+                      final,
+                      segment_id: `replay-${replayId}-${segment}`,
+                    },
+                  }),
+                );
+            }, delay),
+          );
+          return;
+        }
         if (s.upstream?.readyState === 1) {
           if (s.upstream.bufferedAmount > 65536) throw Error();
           s.upstream.send(JSON.stringify(m));
