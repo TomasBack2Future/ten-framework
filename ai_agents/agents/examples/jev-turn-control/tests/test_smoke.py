@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ from ten_runtime import (
     AsyncExtensionTester,
     AsyncTenEnvTester,
     Cmd,
+    Data,
     StatusCode,
 )
 
@@ -30,7 +32,42 @@ class GraphProbe(AsyncExtensionTester):
             "offline-graph-smoke",
             None,
         )
-        assert result.get_property_string("stage") == ("bootstrap_only", None)
+        assert result.get_property_string("stage") == ("decision_mvp", None)
+        command = Cmd.create("jev_input")
+        command.set_property_from_json(
+            None,
+            json.dumps(
+                {
+                    "text": "What is this?",
+                    "final": False,
+                    "segment_id": "native-1",
+                }
+            ),
+        )
+        result, error = await ten_env.send_cmd(command)
+        assert error is None and result.get_status_code() == StatusCode.OK
+        await asyncio.sleep(0.6)
+        result, error = await ten_env.send_cmd(Cmd.create("jev_inspect"))
+        assert error is None
+        raw, _ = result.get_property_to_json("snapshot")
+        state = json.loads(raw)
+        rid = state["payload"]["active_response_id"]
+        assert rid and state["payload"]["phase"] == "speaking"
+        control = Data.create("jev_control")
+        control.set_property_from_json(None, json.dumps({"action": "stop"}))
+        await ten_env.send_data(control)
+        feedback = Data.create("jev_playback")
+        feedback.set_property_from_json(
+            None,
+            json.dumps({"response_id": rid, "played_ms": 500, "stopped": True}),
+        )
+        await ten_env.send_data(feedback)
+        await asyncio.sleep(0.05)
+        result, _ = await ten_env.send_cmd(Cmd.create("jev_inspect"))
+        raw, _ = result.get_property_to_json("snapshot")
+        state = json.loads(raw)
+        assert state["payload"]["active_response_id"] is None
+        assert state["payload"]["stopping_response_id"] is None
         self.verified = True
         ten_env.log_info("JEV_GRAPH_ROUNDTRIP_PASS")
         ten_env.stop_test()
@@ -51,7 +88,12 @@ def test_graph_roundtrip():
         {
             "extension": "ten:test_extension",
             "cmd": [
-                {"name": "jev_ping", "dest": [{"extension": "turn_control"}]}
+                {"name": name, "dest": [{"extension": "turn_control"}]}
+                for name in ("jev_ping", "jev_input", "jev_inspect")
+            ],
+            "data": [
+                {"name": name, "dest": [{"extension": "turn_control"}]}
+                for name in ("jev_control", "jev_playback")
             ],
         }
     ]

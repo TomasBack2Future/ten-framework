@@ -39,6 +39,88 @@
             ]
           }
         }
+      },
+      {
+        "name": "jev_inspect",
+        "result": {
+          "property": {
+            "properties": {
+              "snapshot": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "jev_input",
+        "property": {
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "final": {
+              "type": "bool"
+            },
+            "segment_id": {
+              "type": "string"
+            }
+          }
+        },
+        "result": {
+          "property": {
+            "properties": {
+              "input_revision": {
+                "type": "int64"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "data_in": [
+      {
+        "name": "asr_result"
+      },
+      {
+        "name": "jev_asr"
+      },
+      {
+        "name": "jev_playback"
+      },
+      {
+        "name": "jev_control"
+      },
+      {
+        "name": "tts_audio_start"
+      },
+      {
+        "name": "tts_audio_end"
+      },
+      {
+        "name": "tts_text_result"
+      }
+    ],
+    "data_out": [
+      {
+        "name": "jev_event"
+      },
+      {
+        "name": "tts_text_input"
+      },
+      {
+        "name": "tts_flush"
+      }
+    ],
+    "audio_frame_in": [
+      {
+        "name": "pcm_frame"
+      }
+    ],
+    "audio_frame_out": [
+      {
+        "name": "pcm_frame"
       }
     ]
   }

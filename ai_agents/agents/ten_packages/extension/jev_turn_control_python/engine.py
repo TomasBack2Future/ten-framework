@@ -1,0 +1,536 @@
+"""Clock-injected turn reducer. All methods run on one event-loop thread."""
+
+from collections import deque
+from copy import deepcopy
+
+from .config import Config
+
+
+class TurnEngine:
+    """Bounded input mailbox, revision fences, timers and heard-only memory."""
+
+    def __init__(self, config=None, session_id="demo"):
+        self.config = config or Config.load()
+        self.session_id = session_id
+        self.events = deque(maxlen=self.config["observation"]["buffer_limit"])
+        self.actions = []
+        self.seq = 0
+        self.now = 0
+        self.revision = 0
+        self.epoch = 0
+        self.text = ""
+        self.segment = ""
+        self.committed = ""
+        self.final = False
+        self.pending = False
+        self.first_input = 0
+        self.last_input = 0
+        self.last_request = -100000
+        self.inflight = None
+        self.last_decided = -1
+        self.timer = None
+        self.timer_seq = 0
+        self.active = None
+        self.stopping = None
+        self.responses = {}
+        self.history = deque(
+            maxlen=self.config["playback"]["context_responses"]
+        )
+        self.last_backchannel = -100000
+        self.closed = False
+        self.paused = False
+        self.failed = False
+
+    def emit(self, kind, payload=None, response_id=None):
+        self.seq += 1
+        data = deepcopy(payload or {})
+        if not self.config["observation"]["include_text"]:
+            for key in (
+                "text",
+                "heard_text",
+                "input_text",
+                "context",
+                "phrase",
+            ):
+                if key in data:
+                    data[key] = "[redacted]"
+        event = {
+            "version": 1,
+            "event_id": f"{self.session_id}:{self.seq}",
+            "seq": self.seq,
+            "session_id": self.session_id,
+            "relative_time_ms": self.now,
+            "type": kind,
+            "input_revision": self.revision,
+            "response_id": response_id,
+            "payload": data,
+        }
+        if self.config["observation"]["enabled"]:
+            self.events.append(event)
+        return event
+
+    def action(self, kind, **payload):
+        self.actions.append({"type": kind, **payload})
+
+    def drain_actions(self):
+        actions, self.actions = self.actions, []
+        return actions
+
+    def snapshot(self):
+        state = {
+            "phase": (
+                "closed"
+                if self.closed
+                else (
+                    "paused"
+                    if self.paused
+                    else (
+                        "stopping"
+                        if self.stopping
+                        else "speaking" if self.active else "listening"
+                    )
+                )
+            ),
+            "pending": self.pending,
+            "text": self.text,
+            "response_epoch": self.epoch,
+            "active_response_id": self.active,
+            "stopping_response_id": self.stopping,
+            "timer": deepcopy(self.timer),
+            "inflight": self.inflight is not None,
+            "context": list(self.history),
+            "mode": self.config["provider"]["name"],
+            "playback_precision": "browser_cursor_estimate",
+        }
+        return self.emit("state.snapshot", state, self.active)
+
+    def input(self, text, final, now, segment_id="default"):
+        if self.closed or not text.strip():
+            return
+        self.now = now
+        text = text[:12000]
+        if segment_id != self.segment:
+            if self.segment:
+                self.committed = self.text
+            self.segment = segment_id
+        combined = (self.committed + " " + text).strip()[-16000:]
+        if combined == self.text and final == self.final:
+            return
+        if not self.pending:
+            self.first_input = now
+        self.pending = True
+        self.text, self.final = combined, final
+        self.revision += 1
+        self.last_input = now
+        self.failed = False
+        self.cancel_timer("new_input")
+        self.emit(
+            "asr.updated",
+            {
+                "text": self.text,
+                "final": final,
+                "segment_id": segment_id,
+                "characters": len(self.text),
+            },
+        )
+
+    def cancel_timer(self, reason):
+        if self.timer:
+            self.emit("timer.cancelled", {**self.timer, "reason": reason})
+            self.timer = None
+
+    def schedule(self, label):
+        self.cancel_timer("replaced")
+        self.timer_seq += 1
+        delay = self.config["wait"][label + "_ms"]
+        self.timer = {
+            "timer_id": self.timer_seq,
+            "label": label,
+            "due_ms": min(
+                self.now + delay,
+                self.first_input + self.config["scheduling"]["max_wait_ms"],
+            ),
+            "input_revision": self.revision,
+            "epoch": self.epoch,
+        }
+        self.emit("timer.scheduled", self.timer)
+
+    def begin_decision(self, now):
+        self.now = now
+        if self.closed or self.paused or not self.pending or self.inflight:
+            return None
+        cfg = self.config["scheduling"]
+        if (
+            self.revision == self.last_decided
+            or now - self.last_request < cfg["min_interval_ms"]
+        ):
+            return None
+        # Debounce has a hard maximum: never reset it for every partial.
+        if (
+            now - self.last_input < cfg["merge_ms"]
+            and now
+            - (
+                self.last_request
+                if self.last_request >= 0
+                else self.first_input
+            )
+            < cfg["min_interval_ms"] + cfg["merge_ms"]
+        ):
+            return None
+        if not self.config["turn"]["enabled"]:
+            return None
+        kinds = [
+            k
+            for k in ("stop", "start", "backchannel")
+            if self.config[k]["enabled"] and (k != "stop" or self.active)
+        ]
+        if not kinds:
+            return None
+        request = {
+            "revision": self.revision,
+            "epoch": self.epoch,
+            "started_ms": now,
+            "kinds": kinds,
+            "state": {
+                "input_text": self.text,
+                "asr_final": self.final,
+                "assistant_speaking": bool(self.active),
+                "heard_context": list(self.history),
+                "silence_ms": now - self.last_input,
+            },
+        }
+        self.inflight = request
+        self.last_request = now
+        for kind in kinds:
+            self.emit(
+                "decision.started",
+                {
+                    "decision_kind": kind,
+                    "provider": self.config["provider"]["name"],
+                    "input_text": self.text,
+                    "input_characters": len(self.text),
+                    "context_responses": len(self.history),
+                },
+            )
+        return deepcopy(request)
+
+    def complete_decision(self, request, answers, now, error=None):
+        self.now = now
+        if self.inflight != request:
+            return
+        self.inflight = None
+        stale = (
+            self.closed
+            or request["revision"] != self.revision
+            or request["epoch"] != self.epoch
+        )
+        reason = (
+            "closed"
+            if self.closed
+            else (
+                "input_revision"
+                if request["revision"] != self.revision
+                else "response_epoch"
+            )
+        )
+        for kind in request["kinds"]:
+            answer = answers.get(kind, {})
+            self.emit(
+                "decision.discarded" if stale else "decision.completed",
+                {
+                    "decision_kind": kind,
+                    "provider": self.config["provider"]["name"],
+                    "label": answer.get("label", "error"),
+                    "score": answer.get("score"),
+                    "probabilities": answer.get("probabilities", {}),
+                    "duration_ms": now - request["started_ms"],
+                    "applied": False,
+                    "discard_reason": (
+                        reason if stale else "provider_error" if error else ""
+                    ),
+                },
+                self.active,
+            )
+        if stale:
+            return
+        self.last_decided = self.revision
+        if error:
+            self.failed = True
+            self.emit(
+                "error", {"code": "provider_unavailable", "recoverable": True}
+            )
+            return
+        stop = answers.get("stop", {})
+        if (
+            self.active
+            and stop.get("label") == "stop"
+            and stop.get("score", 0) >= self.config["stop"]["threshold"]
+        ):
+            self.mark_applied("stop")
+            self.stop("user_reclaims_floor")
+            self.schedule("continuation")
+            return
+        start = answers.get("start", {})
+        label = start.get("label")
+        if label in (
+            "answer",
+            "clarify",
+            "continuation",
+            "explicit_wait",
+            "ignore",
+        ):
+            if start.get("score", 0) >= self.config["start"]["threshold"]:
+                self.mark_applied("start")
+                self.schedule(label)
+        bc = answers.get("backchannel", {})
+        if (
+            not self.active
+            and not self.stopping
+            and label not in ("answer", "clarify")
+            and bc.get("label") == "backchannel"
+            and bc.get("score", 0) >= self.config["backchannel"]["threshold"]
+            and now - request["started_ms"]
+            <= self.config["backchannel"]["valid_ms"]
+            and now - self.last_backchannel
+            >= self.config["backchannel"]["cooldown_ms"]
+        ):
+            self.mark_applied("backchannel")
+            self.last_backchannel = now
+            self.start("backchannel")
+
+    def mark_applied(self, kind):
+        for event in reversed(self.events):
+            if (
+                event["type"] == "decision.completed"
+                and event["input_revision"] == self.revision
+                and event["payload"]["decision_kind"] == kind
+            ):
+                event["payload"]["applied"] = True
+                break
+
+    def tick(self, now):
+        self.now = now
+        if self.closed or self.paused:
+            return
+        if self.stopping:
+            response = self.responses[self.stopping]
+            if now >= response["stop_deadline"]:
+                self.playback(
+                    self.stopping,
+                    response["played_ms"],
+                    now,
+                    stopped=True,
+                    confirmed=False,
+                )
+        if (
+            self.pending
+            and self.active
+            and self.config["stop"]["enabled"]
+            and now >= self.first_input + self.config["stop"]["max_wait_ms"]
+            and self.last_decided != self.revision
+        ):
+            self.stop("stop_maximum_wait")
+            self.schedule("continuation")
+        if (
+            not self.pending
+            or self.active
+            or self.stopping
+            or not self.config["start"]["enabled"]
+        ):
+            return
+        if self.failed and self.config["provider"]["failure_policy"] == "hold":
+            return
+        maximum = (
+            now >= self.first_input + self.config["scheduling"]["max_wait_ms"]
+        )
+        due = self.timer and now >= self.timer["due_ms"]
+        if not maximum and not due:
+            return
+        label = self.timer["label"] if self.timer else "clarify"
+        if due:
+            self.emit("timer.fired", self.timer)
+        else:
+            self.emit(
+                "timer.fired",
+                {
+                    "label": "maximum_wait",
+                    "due_ms": self.first_input
+                    + self.config["scheduling"]["max_wait_ms"],
+                },
+            )
+        self.timer = None
+        if label == "ignore":
+            self.pending = False
+            return
+        self.start("answer" if label == "answer" else "clarify")
+
+    def start(self, mode):
+        if self.active or self.stopping or self.closed:
+            return
+        self.epoch += 1
+        rid = f"{self.session_id}-r{self.epoch}"
+        self.active = rid
+        self.responses[rid] = {
+            "text": "",
+            "played_ms": 0,
+            "alignment": [],
+            "mode": mode,
+            "precision": "unknown",
+            "generation_done": False,
+        }
+        if mode != "backchannel":
+            self.pending = False
+            self.committed = ""
+            self.segment = ""
+            self.cancel_timer("response_started")
+        self.emit(
+            "response.started",
+            {
+                "mode": mode,
+                "reason": "timer_or_decision",
+                "input_text": self.text,
+            },
+            rid,
+        )
+        self.action(
+            "response.start",
+            session_id=self.session_id,
+            input_revision=self.revision,
+            response_id=rid,
+            mode=mode,
+            input_text=self.text,
+            context=list(self.history),
+            phrase=(
+                self.config["backchannel"]["phrases"][0]
+                if mode == "backchannel"
+                else ""
+            ),
+        )
+
+        if mode != "backchannel":
+            self.history.append({"role": "user", "text": self.text})
+
+    def stop(self, reason):
+        if not self.active:
+            return
+        rid, self.active = self.active, None
+        self.epoch += 1
+        self.stopping = rid
+        self.responses[rid]["stop_deadline"] = (
+            self.now + self.config["playback"]["stop_ack_timeout_ms"]
+        )
+        self.cancel_timer("stop_priority")
+        self.emit(
+            "response.cancelled",
+            {"reason": reason, "awaiting_playback_ack": True},
+            rid,
+        )
+        self.action("response.cancel", response_id=rid, reason=reason)
+
+    def output(self, rid, text, now, final=False):
+        self.now = now
+        if rid != self.active or self.closed:
+            self.emit("response.discarded", {"reason": "response_epoch"}, rid)
+            return False
+        response = self.responses[rid]
+        response["text"] = (response["text"] + text)[:24000]
+        response["generation_done"] = final
+        self.emit(
+            "response.text", {"text": response["text"], "final": final}, rid
+        )
+        return True
+
+    def align(self, rid, words):
+        if rid in self.responses:
+            valid = [
+                w
+                for w in words
+                if isinstance(w.get("text"), str)
+                and isinstance(w.get("end_ms"), (int, float))
+                and w["end_ms"] >= 0
+            ]
+            self.responses[rid]["alignment"] = sorted(
+                self.responses[rid]["alignment"] + valid,
+                key=lambda w: w["end_ms"],
+            )[:5000]
+
+    def playback(
+        self,
+        rid,
+        played_ms,
+        now,
+        stopped=False,
+        completed=False,
+        confirmed=True,
+    ):
+        self.now = now
+        if rid not in self.responses or rid not in (self.active, self.stopping):
+            return
+        response = self.responses[rid]
+        response["played_ms"] = max(
+            response["played_ms"], min(max(0, played_ms), 3600000)
+        )
+        words = response["alignment"]
+        if words:
+            heard = "".join(
+                w["text"] for w in words if w["end_ms"] <= response["played_ms"]
+            )
+            precision = "provider_alignment_browser_cursor"
+        else:
+            count = int(
+                response["played_ms"]
+                / 1000
+                * self.config["playback"]["chars_per_second"]
+            )
+            heard = response["text"][:count]
+            precision = "character_rate_estimate"
+        response["precision"] = precision
+        self.emit(
+            "playback.stopped" if stopped else "playback.progress",
+            {
+                "played_ms": response["played_ms"],
+                "heard_text": heard,
+                "precision": precision,
+                "confirmed": confirmed,
+                "completed": completed,
+            },
+            rid,
+        )
+        if stopped or completed:
+            self.history.append(
+                {
+                    "role": "assistant",
+                    "text": heard,
+                    "response_id": rid,
+                    "precision": precision,
+                    "confirmed": confirmed,
+                }
+            )
+            if self.active == rid:
+                self.active = None
+            if self.stopping == rid:
+                self.stopping = None
+            del self.responses[rid]
+
+    def pause(self, now):
+        self.now = now
+        self.paused = True
+        self.epoch += 1
+        self.cancel_timer("paused")
+        self.stop("paused")
+        self.snapshot()
+
+    def resume(self, now):
+        self.now = now
+        self.paused = False
+        self.last_decided = -1
+        self.snapshot()
+
+    def close(self, now):
+        self.now = now
+        self.stop("disconnect")
+        self.cancel_timer("disconnect")
+        self.closed = True
+        self.epoch += 1
+        self.pending = False
+        self.snapshot()

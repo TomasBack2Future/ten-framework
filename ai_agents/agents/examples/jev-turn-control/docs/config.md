@@ -66,8 +66,23 @@ request snapshot and never resume old audio. Single WS client per demo session.
 
 ## Public provider graph
 
-Planned overseas chain: Deepgram ASR → this extension → openai_llm2 → this
-extension → ElevenLabs TTS → this extension (response fence + metadata) → WS.
-Keys: DEEPGRAM_API_KEY, OPENAI_API_KEY, ELEVENLABS_TTS_KEY, JEV_API_KEY.
+Overseas chain: Soniox ASR → this extension → openai_llm2 (Groq) → this
+extension → Cartesia TTS → this extension (response fence + metadata) → WS.
+Keys: SONIOX_API_KEY, GROQ_API_KEY, CARTESIA_API_KEY, JEV_API_KEY.
 Default offline graph needs no keys. Real speech is unverified until keys and a
 microphone/playback session exercise the complete graph.
+
+
+Defaults verified with synthetic live requests: Soniox stt-rt-v3, Groq
+openai/gpt-oss-20b (the tested key cannot access llama-3.3-70b-versatile),
+Cartesia sonic-3 / voice a0e99841-438c-4a64-b679-ae501e7d6091, PCM16 mono 16kHz,
+enable_words=true. Models/voice can be changed via SONIOX_MODEL, GROQ_MODEL,
+CARTESIA_MODEL, CARTESIA_VOICE_ID at server start. All endpoints are overseas.
+Soniox final tokens are committed ASR segments, not a user turn boundary.
+Cartesia words arrive as word/start_ms/duration_ms and accumulate per response.
+`response.text` carries generated text (no reasoning), `response.audio_completed`
+means generation drained; browser reports completion only after its sources drain.
+The protected demo runner opts in to include_text; base extension stays redacted.
+`stop.max_wait_ms=800` conservatively yields if high-frequency input prevents
+any current stop judgment from applying. Supported short acknowledgments that
+have a current continue judgment do not trigger this fallback.

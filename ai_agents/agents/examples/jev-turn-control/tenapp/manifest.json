@@ -15,6 +15,18 @@
     },
     {
       "path": "../../../ten_packages/extension/jev_turn_control_python"
+    },
+    {
+      "path": "../../../ten_packages/extension/websocket_server"
+    },
+    {
+      "path": "../../../ten_packages/extension/soniox_asr_python"
+    },
+    {
+      "path": "../../../ten_packages/extension/openai_llm2_python"
+    },
+    {
+      "path": "../../../ten_packages/extension/cartesia_tts"
     }
   ],
   "scripts": {
