@@ -25,37 +25,38 @@ def main():
         "JEV_CODEX_ENABLED": "false",
         "JEV_EXECUTOR_TOKEN": token,
     }
-    process = subprocess.Popen(
+    with subprocess.Popen(
         [sys.executable, "-m", "executor.service"], env=env
-    )
-    try:
-        for _ in range(50):
-            try:
-                with urllib.request.urlopen(
-                    "http://127.0.0.1:8080/healthz", timeout=1
-                ) as response:
-                    assert json.load(response) == {"enabled": False}
-                    break
-            except urllib.error.URLError:
-                time.sleep(0.1)
-        else:
-            raise AssertionError("service did not start")
-        for headers, expected in (
-            ({}, 401),
-            ({"Authorization": "Bearer " + token}, 503),
-        ):
-            request = urllib.request.Request(
-                "http://127.0.0.1:8080/sessions", method="POST", headers=headers
-            )
-            try:
-                urllib.request.urlopen(request, timeout=1)
-            except urllib.error.HTTPError as error:
-                assert error.code == expected
+    ) as process:
+        try:
+            for _ in range(50):
+                try:
+                    with urllib.request.urlopen(
+                        "http://127.0.0.1:8080/healthz", timeout=1
+                    ) as response:
+                        assert json.load(response) == {"enabled": False}
+                        break
+                except urllib.error.URLError:
+                    time.sleep(0.1)
             else:
-                raise AssertionError("disabled session admitted")
-    finally:
-        process.terminate()
-        process.wait(timeout=10)
+                raise AssertionError("service did not start")
+            for headers, expected in (
+                ({}, 401),
+                ({"Authorization": "Bearer " + token}, 503),
+            ):
+                request = urllib.request.Request(
+                    "http://127.0.0.1:8080/sessions",
+                    method="POST",
+                    headers=headers,
+                )
+                try:
+                    with urllib.request.urlopen(request, timeout=1):
+                        raise AssertionError("disabled session admitted")
+                except urllib.error.HTTPError as error:
+                    assert error.code == expected
+        finally:
+            process.terminate()
+            process.wait(timeout=10)
     enabled = subprocess.run(
         [sys.executable, "-m", "executor.service"],
         env={**env, "JEV_CODEX_ENABLED": "true"},
