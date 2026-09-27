@@ -12,12 +12,18 @@ spec:
     metadata:
       labels: {app: jev-demo}
     spec:
+      securityContext: {fsGroup: 1000}
+      volumes:
+      - name: evidence
+        persistentVolumeClaim: {claimName: jev-demo-evidence}
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 15
       containers:
       - name: demo
         image: ghcr.io/tomasback2future/jev-turn-control:REPLACE_WITH_SHA
         imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - {name: evidence, mountPath: /var/lib/jev-evidence}
         ports: [{containerPort: 3000, name: http}]
         env:
         - {name: JEV_MODE, value: mock}
@@ -25,7 +31,7 @@ spec:
         - {name: JEV_SESSION_SECONDS, value: '300'}
         # Kong overwrites X-Real-IP with $remote_addr (verified on this ingress).
         - {name: JEV_TRUST_PROXY, value: '1'}
-        - {name: JEV_EVENT_LOG_DIR, value: /tmp/jev-observations}
+        - {name: JEV_EVENT_LOG_DIR, value: /var/lib/jev-evidence}
         - name: JEV_ACCESS_CODE
           valueFrom: {secretKeyRef: {name: jev-demo-access, key: JEV_ACCESS_CODE}}
         resources:
@@ -83,3 +89,14 @@ spec:
           service:
             name: jev-demo
             port: {number: 80}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jev-demo-evidence
+  namespace: ten-jev-demo
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 20Gi

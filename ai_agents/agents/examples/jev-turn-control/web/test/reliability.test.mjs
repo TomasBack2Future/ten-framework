@@ -172,18 +172,18 @@ test("graph readiness gates media, queues early stop, and disconnect forwards st
   assert.equal(commands.filter((m) => m.audio).length, 0);
   await post("/api/end", { session_id: created.id });
 });
-test("observation redaction retains correlation but omits credentials and text by default", () => {
+test("observation preserves business text and removes credentials", () => {
   const raw = {
     type: "context.request",
     response_id: "r1",
     payload: { input_text: "private", api_key: "secret", context_revision: 3 },
   };
   assert.deepEqual(redact(raw).payload, {
-    input_text: "[redacted]",
-    api_key: "[redacted]",
+    input_text: "private",
+    api_key: "[credential]",
     context_revision: 3,
   });
-  assert.equal(redact(raw, true).payload.api_key, "[redacted]");
+  assert.equal(redact(raw, true).payload.api_key, "[credential]");
 });
 
 test("worker spawn failure clears reservation and permits retry", async (t) => {
@@ -198,7 +198,7 @@ test("worker spawn failure clears reservation and permits retry", async (t) => {
   await post("/api/end", { session_id: retried.id });
 });
 
-test("bounded observation files persist after graph exit with private permissions", async (t) => {
+test("all session evidence persists with private permissions", async (t) => {
   const { mkdtemp, readdir, readFile, stat, rm } = await import(
     "node:fs/promises"
   );
@@ -218,15 +218,18 @@ test("bounded observation files persist after graph exit with private permission
       type: "asr.updated",
       payload: { text: "private transcript", api_key: "credential" },
     });
-    log.close();
-    await sleep(5);
+    await log.close();
   }
   const files = await readdir(dir);
-  assert.equal(files.length, 10);
-  const text = await readFile(`${dir}/${files[0]}`, "utf8");
+  assert.equal(files.length, 12);
+  const text = await readFile(`${dir}/${files[0]}/web.jsonl`, "utf8");
   assert.match(text, /test-revision/);
-  assert.doesNotMatch(text, /private transcript|credential/);
-  assert.equal((await stat(`${dir}/${files[0]}`)).mode & 0o777, 0o600);
+  assert.match(text, /private transcript/);
+  assert.doesNotMatch(text, /"api_key":"credential"/);
+  assert.equal(
+    (await stat(`${dir}/${files[0]}/web.jsonl`)).mode & 0o777,
+    0o600,
+  );
 });
 
 test("decision mode and profile validation, defaults and credential availability", async (t) => {

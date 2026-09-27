@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import json
 import random
+import time
 from typing import Any, AsyncGenerator, List
 from pydantic import BaseModel
 import httpx
@@ -31,6 +32,7 @@ from ten_ai_base.struct import (
     TextContent,
 )
 from ten_ai_base.types import LLMToolMetadata
+from ten_runtime import Data
 from ten_runtime.async_ten_env import AsyncTenEnv
 
 from .think_parser import ThinkParser
@@ -38,6 +40,7 @@ from .think_parser import ThinkParser
 
 @dataclass
 class OpenAILLM2Config(BaseModel):
+    emit_evidence: bool = False
     api_key: str = ""
     base_url: str = "https://api.openai.com/v1"
     model: str = (
@@ -95,6 +98,24 @@ class OpenAIChatGPT:
             default_headers=default_headers,
             http_client=self.http_client,
         )
+
+    async def observe(self, phase, request_id, body):
+        if not self.config.emit_evidence:
+            return
+        event = Data.create("llm_evidence")
+        event.set_property_from_json(
+            None,
+            json.dumps(
+                {
+                    "phase": phase,
+                    "request_id": request_id,
+                    "wall_time_ns": time.time_ns(),
+                    "monotonic_ns": time.monotonic_ns(),
+                    "body": body,
+                }
+            ),
+        )
+        await self.ten_env.send_data(event)
 
     def _convert_tools_to_dict(self, tool: LLMToolMetadata):
         json_dict = {
@@ -241,6 +262,7 @@ class OpenAIChatGPT:
             f"Requesting chat completions: message_count={len(req['messages'])}"
         )
 
+        await self.observe("request", request_input.request_id, req)
         try:
             response: AsyncStream[ChatCompletionChunk] = (
                 await self.client.chat.completions.create(**req)
@@ -263,6 +285,15 @@ class OpenAIChatGPT:
             last_chat_completion: ChatCompletionChunk | None = None
 
             async for chat_completion in response:
+                await self.observe(
+                    "stream",
+                    request_input.request_id,
+                    (
+                        chat_completion.model_dump(mode="json")
+                        if chat_completion
+                        else {}
+                    ),
+                )
                 self.ten_env.log_debug(f"Chat completion: {chat_completion}")
                 if chat_completion is None or len(chat_completion.choices) == 0:
                     continue

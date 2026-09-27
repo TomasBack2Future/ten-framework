@@ -1,85 +1,119 @@
-import {
-  mkdirSync,
-  readdirSync,
-  unlinkSync,
-  createWriteStream,
-  openSync,
-} from "node:fs";
+import { mkdirSync, createWriteStream, openSync } from "node:fs";
 import path from "node:path";
-const textKeys = new Set([
-  "text",
-  "heard_text",
-  "input_text",
-  "context",
-  "heard_context",
-  "context_summary",
-  "summary",
-  "phrase",
-  "prompt",
-]);
-export function redact(value, includeText = false, depth = 0) {
-  if (depth > 8) return "[bounded]";
-  if (typeof value === "string") return value.slice(0, 24000);
-  if (Array.isArray(value))
-    return value.slice(0, 128).map((x) => redact(x, includeText, depth + 1));
+import { finished } from "node:stream/promises";
+
+const credential =
+  /api[_-]?key|authorization|cookie|password|secret|access[_-]?token|refresh[_-]?token|access[_-]?code|^token$|[_-]token$|[_-]key$|certificate/i;
+export function redact(value) {
+  if (typeof value === "string") {
+    for (const [name, secret] of Object.entries(process.env))
+      if (credential.test(name) && secret)
+        value = value.split(secret).join("[credential]");
+    return value.replace(
+      /Bearer\s+[A-Za-z0-9._~+/=-]+/gi,
+      "Bearer [credential]",
+    );
+  }
+  if (Array.isArray(value)) return value.map(redact);
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(
-    Object.entries(value)
-      .slice(0, 80)
-      .map(([k, v]) => [
-        k,
-        /key|token|cookie|authorization|secret/i.test(k) ||
-        (!includeText && textKeys.has(k))
-          ? "[redacted]"
-          : redact(v, includeText, depth + 1),
-      ]),
+    Object.entries(value).map(([k, v]) => [
+      k,
+      credential.test(k) ? "[credential]" : redact(v),
+    ]),
   );
 }
 export function observer(sessionId, revision) {
-  const directory = process.env.JEV_EVENT_LOG_DIR;
-  if (!directory) return { write() {}, close() {} };
+  const root = process.env.JEV_EVENT_LOG_DIR;
+  if (!root)
+    return {
+      write() {},
+      audio() {},
+      close() {
+        return Promise.resolve();
+      },
+    };
+  if (!/^[a-zA-Z0-9_-]+$/.test(sessionId))
+    throw Error("Invalid evidence session id");
+  const directory = path.join(root, sessionId);
   mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const files = readdirSync(directory)
-    .filter((x) => /^jev-\d+-[a-f0-9]+\.jsonl$/.test(x))
-    .sort();
-  for (const file of files.slice(0, Math.max(0, files.length - 9)))
-    unlinkSync(path.join(directory, file));
-  const filename = path.join(directory, `jev-${Date.now()}-${sessionId}.jsonl`);
-  const stream = createWriteStream(filename, {
-    fd: openSync(filename, "wx", 0o600),
-    autoClose: true,
-  });
-  let bytes = 0,
-    disabled = false;
-  stream.on("error", () => {
-    disabled = true;
-  });
+  const streams = new Map(),
+    offsets = new Map();
+  let sequence = 0,
+    closed = false,
+    failure;
+  function stream(name) {
+    if (!streams.has(name)) {
+      const output = createWriteStream(path.join(directory, name), {
+        fd: openSync(path.join(directory, name), "ax", 0o600),
+        autoClose: true,
+      });
+      output.on("error", () => {
+        failure = Error("Evidence storage failed");
+        console.error("JEV_EVIDENCE_WRITE_FAILED");
+      });
+      streams.set(name, output);
+    }
+    return streams.get(name);
+  }
+  function append(name, data) {
+    if (failure) return false;
+    if (closed) throw Error("Evidence session closed");
+    let output;
+    try {
+      output = stream(name);
+    } catch {
+      console.error("JEV_EVIDENCE_OPEN_FAILED");
+      failure = Error("Evidence storage unavailable");
+      return false;
+    }
+    if (output.writableLength > 64 * 1024 * 1024) {
+      console.error("JEV_EVIDENCE_QUEUE_FULL");
+      failure = Error("Evidence storage stalled");
+      return false;
+    }
+    output.write(data);
+    return true;
+  }
+  const write = (event) => {
+    append(
+      "web.jsonl",
+      JSON.stringify({
+        schema: "jev.evidence.v1",
+        source: "web",
+        record_seq: ++sequence,
+        session_id: sessionId,
+        revision,
+        wall_time_ms: Date.now(),
+        monotonic_ns: process.hrtime.bigint().toString(),
+        event: redact(event),
+      }) + "\n",
+    );
+  };
   return {
-    write(event) {
-      if (disabled) return;
-      const line =
-        JSON.stringify({
-          revision,
-          session_id: sessionId,
-          recorded_at: new Date().toISOString(),
-          ...redact(event, process.env.JEV_EVENT_LOG_TEXT === "1"),
-        }) + "\n";
-      bytes += Buffer.byteLength(line);
-      if (bytes > 2 * 1024 * 1024 || stream.writableLength > 65536) {
-        disabled = true;
-        stream.end(
-          JSON.stringify({
-            type: "observation.limit",
-            revision,
-            session_id: sessionId,
-          }) + "\n",
-        );
-        return;
-      }
-      stream.write(line);
+    write,
+    audio(direction, encoded, metadata) {
+      const name = direction === "input" ? "user.pcm" : "delivered.pcm";
+      const pcm = Buffer.from(encoded, "base64"),
+        offset = offsets.get(name) || 0;
+      if (!append(name, pcm)) return;
+      offsets.set(name, offset + pcm.length);
+      write({
+        type: `audio.${direction}`,
+        response_id: metadata?.response_id,
+        payload: { file: name, offset, length: pcm.length, metadata },
+      });
     },
-    close() {
-      stream.end();
+    async close() {
+      if (closed) return;
+      closed = true;
+      const pending = [...streams.values()].map((output) => {
+        const done = finished(output);
+        output.end();
+        return done;
+      });
+      await Promise.all(pending);
+      if (failure) throw failure;
     },
   };
 }

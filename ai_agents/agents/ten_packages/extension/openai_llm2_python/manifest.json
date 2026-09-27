@@ -50,8 +50,36 @@
         "custom_headers": {
           "type": "object",
           "properties": {}
+        },
+        "emit_evidence": {
+          "type": "bool"
         }
       }
-    }
+    },
+    "data_out": [
+      {
+        "name": "llm_evidence",
+        "property": {
+          "properties": {
+            "phase": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "wall_time_ns": {
+              "type": "int64"
+            },
+            "monotonic_ns": {
+              "type": "int64"
+            },
+            "body": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      }
+    ]
   }
 }

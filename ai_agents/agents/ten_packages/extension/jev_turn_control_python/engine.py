@@ -10,7 +10,8 @@ from .config import Config
 class TurnEngine:
     """Bounded input mailbox, revision fences, timers and heard-only memory."""
 
-    def __init__(self, config=None, session_id="demo"):
+    def __init__(self, config=None, session_id="demo", event_sink=None):
+        self.event_sink = event_sink
         self.config = config or Config.load()
         self.session_id = session_id
         self.events = deque(maxlen=self.config["observation"]["buffer_limit"])
@@ -55,6 +56,18 @@ class TurnEngine:
     def emit(self, kind, payload=None, response_id=None):
         self.seq += 1
         data = deepcopy(payload or {})
+        if self.event_sink:
+            self.event_sink(
+                "engine.event",
+                {
+                    "seq": self.seq,
+                    "relative_time_ms": self.now,
+                    "type": kind,
+                    "input_revision": self.revision,
+                    "payload": data,
+                },
+                response_id,
+            )
         if not self.config["observation"]["include_text"]:
             for key in (
                 "text",
