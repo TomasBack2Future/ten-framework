@@ -6,7 +6,7 @@ the optional official SDK is pinned in `requirements-sdk.txt`.
 
 ## Integration contract
 
-The voice engine owns the `jev.v1` envelope and speech lifecycle. Instantiate one
+The voice engine owns the `version: 1` observation envelope and speech lifecycle. Instantiate one
 `Executor(backend, ExecutorConfig(...))` per worker. Import the package from the
 example directory. After independently classifying an accepted turn:
 
@@ -37,7 +37,11 @@ Control action extraction remains the integrating voice application's job; this
 module does not infer cancellation from arbitrary strings or cancel all tasks.
 
 Drain `executor.events` independently of playback. Wrap type/session_id/payload
-into the common v1 envelope (timestamp and sequence owned by host). Emitted:
+into the common v1 envelope. The host supplies `version=1`, `event_id`, `seq`,
+`relative_time_ms`, top-level `input_revision` copied from the payload, and
+`response_id=null` for task-only events. The voice schema owner must add the
+`task.*` enum values before publishing these events; the bootstrap schema does
+not already declare them. Emitted:
 `task.started`, `task.completed`, `task.cancelled`, `task.error`; generic progress
 can be represented by the running status. Payload: task_id, turn_id,
 input_revision, status, summary, artifacts[{name,sha256,bytes}]. No reasoning,
