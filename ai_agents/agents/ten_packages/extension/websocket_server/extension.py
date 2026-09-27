@@ -69,6 +69,7 @@ class WebsocketServerExtension(AsyncExtension):
                 port=self.config.port,
                 ten_env=ten_env,
                 on_audio_callback=self._on_audio_received,
+                on_data_callback=self._on_client_data,
             )
             await self.ws_server.start()
             ten_env.log_info(
@@ -137,10 +138,9 @@ class WebsocketServerExtension(AsyncExtension):
         data_name = data.get_name()
         ten_env.log_debug(f"Received data: {data_name}")
         try:
-            if data_name == "text_data":
+            if data_name in ("text_data", "jev_event"):
                 # Convert data to JSON
                 data_json, _ = data.get_property_to_json(None)
-                ten_env.log_info(f"Data: {data_json}")
                 data_dict = json.loads(data_json)
 
                 # Broadcast to all WebSocket clients
@@ -185,7 +185,7 @@ class WebsocketServerExtension(AsyncExtension):
             # Extract metadata if present
             metadata = {}
             try:
-                metadata_json = audio_frame.get_property_string("metadata")
+                metadata_json, _ = audio_frame.get_property_to_json("metadata")
                 if metadata_json:
                     metadata = json.loads(metadata_json)
             except Exception:
@@ -220,6 +220,14 @@ class WebsocketServerExtension(AsyncExtension):
         """Handle video frames (not typically used for this extension)"""
         video_frame_name = video_frame.get_name()
         ten_env.log_debug(f"Received video frame: {video_frame_name}")
+
+    async def _on_client_data(self, name: str, payload: dict) -> None:
+        """Forward only allowlisted demo observations/control to the graph."""
+        if name not in ("jev_control", "jev_playback", "jev_asr"):
+            return
+        data = Data.create(name)
+        data.set_property_from_json("", json.dumps(payload))
+        await self.ten_env.send_data(data)
 
     async def _on_audio_received(self, audio_data: AudioData) -> None:
         """
