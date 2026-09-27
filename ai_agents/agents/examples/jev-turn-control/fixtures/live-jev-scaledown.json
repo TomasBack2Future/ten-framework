@@ -1,0 +1,243 @@
+{
+  "synthetic": true,
+  "location": "local client; not khipaa latency",
+  "records": [
+    {
+      "input": "What time does the museum open?",
+      "jev_ms": 748.7,
+      "jev": {
+        "start": {
+          "label": "answer",
+          "score": 0.86,
+          "probabilities": {
+            "continuation": 0.12,
+            "explicit_wait": 0.0,
+            "clarify": 0.01,
+            "ignore": 0.01,
+            "answer": 0.86
+          }
+        },
+        "stop": {
+          "label": "stop",
+          "score": 0.7,
+          "probabilities": {
+            "stop": 0.7,
+            "continue": 0.3
+          }
+        },
+        "backchannel": {
+          "label": "silent",
+          "score": 0.92,
+          "probabilities": {
+            "silent": 0.92,
+            "backchannel": 0.08
+          }
+        }
+      },
+      "scaledown_ms": 2364.4,
+      "compressed_available": true,
+      "response_keys": [
+        "results",
+        "model_used",
+        "input_tokens",
+        "total_original_tokens",
+        "total_compressed_tokens",
+        "num_pairs_processed",
+        "num_successful",
+        "num_failed",
+        "successful",
+        "partially_successful",
+        "latency_ms",
+        "request_metadata"
+      ],
+      "scaledown_then_jev": {
+        "start": {
+          "label": "answer",
+          "score": 0.95,
+          "probabilities": {
+            "answer": 0.95,
+            "explicit_wait": 0.0,
+            "clarify": 0.02,
+            "ignore": 0.0,
+            "continuation": 0.03
+          }
+        },
+        "stop": {
+          "label": "stop",
+          "score": 0.65,
+          "probabilities": {
+            "continue": 0.35,
+            "stop": 0.65
+          }
+        },
+        "backchannel": {
+          "label": "silent",
+          "score": 0.94,
+          "probabilities": {
+            "silent": 0.94,
+            "backchannel": 0.06
+          }
+        }
+      },
+      "second_jev_ms": 322.6
+    },
+    {
+      "input": "Wait, let me finish my question.",
+      "jev_ms": 290.6,
+      "jev": {
+        "start": {
+          "label": "explicit_wait",
+          "score": 0.87,
+          "probabilities": {
+            "answer": 0.01,
+            "explicit_wait": 0.87,
+            "ignore": 0.0,
+            "clarify": 0.0,
+            "continuation": 0.12
+          }
+        },
+        "stop": {
+          "label": "stop",
+          "score": 0.98,
+          "probabilities": {
+            "continue": 0.02,
+            "stop": 0.98
+          }
+        },
+        "backchannel": {
+          "label": "silent",
+          "score": 0.54,
+          "probabilities": {
+            "silent": 0.54,
+            "backchannel": 0.46
+          }
+        }
+      },
+      "scaledown_ms": 948.9,
+      "compressed_available": true,
+      "response_keys": [
+        "results",
+        "model_used",
+        "input_tokens",
+        "total_original_tokens",
+        "total_compressed_tokens",
+        "num_pairs_processed",
+        "num_successful",
+        "num_failed",
+        "successful",
+        "partially_successful",
+        "latency_ms",
+        "request_metadata"
+      ],
+      "scaledown_then_jev": {
+        "start": {
+          "label": "explicit_wait",
+          "score": 0.85,
+          "probabilities": {
+            "clarify": 0.0,
+            "continuation": 0.15,
+            "explicit_wait": 0.85,
+            "ignore": 0.0,
+            "answer": 0.0
+          }
+        },
+        "stop": {
+          "label": "stop",
+          "score": 0.98,
+          "probabilities": {
+            "stop": 0.98,
+            "continue": 0.02
+          }
+        },
+        "backchannel": {
+          "label": "backchannel",
+          "score": 0.54,
+          "probabilities": {
+            "backchannel": 0.54,
+            "silent": 0.46
+          }
+        }
+      },
+      "second_jev_ms": 307.7
+    },
+    {
+      "input": "Yes, go on.",
+      "jev_ms": 329.2,
+      "jev": {
+        "start": {
+          "label": "continuation",
+          "score": 0.75,
+          "probabilities": {
+            "explicit_wait": 0.05,
+            "clarify": 0.0,
+            "ignore": 0.01,
+            "continuation": 0.75,
+            "answer": 0.19
+          }
+        },
+        "stop": {
+          "label": "continue",
+          "score": 0.89,
+          "probabilities": {
+            "continue": 0.89,
+            "stop": 0.11
+          }
+        },
+        "backchannel": {
+          "label": "backchannel",
+          "score": 0.52,
+          "probabilities": {
+            "silent": 0.48,
+            "backchannel": 0.52
+          }
+        }
+      },
+      "scaledown_ms": 1441.9,
+      "compressed_available": true,
+      "response_keys": [
+        "results",
+        "model_used",
+        "input_tokens",
+        "total_original_tokens",
+        "total_compressed_tokens",
+        "num_pairs_processed",
+        "num_successful",
+        "num_failed",
+        "successful",
+        "partially_successful",
+        "latency_ms",
+        "request_metadata"
+      ],
+      "scaledown_then_jev": {
+        "start": {
+          "label": "continuation",
+          "score": 0.81,
+          "probabilities": {
+            "explicit_wait": 0.05,
+            "answer": 0.11,
+            "continuation": 0.81,
+            "clarify": 0.0,
+            "ignore": 0.03
+          }
+        },
+        "stop": {
+          "label": "continue",
+          "score": 0.93,
+          "probabilities": {
+            "continue": 0.93,
+            "stop": 0.07
+          }
+        },
+        "backchannel": {
+          "label": "silent",
+          "score": 0.65,
+          "probabilities": {
+            "backchannel": 0.35,
+            "silent": 0.65
+          }
+        }
+      },
+      "second_jev_ms": 297.7
+    }
+  ]
+}

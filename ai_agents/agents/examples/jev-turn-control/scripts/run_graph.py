@@ -1,4 +1,5 @@
 """Create one private session graph; exec the public TEN app without editing it."""
+
 import argparse
 import json
 import os
@@ -9,61 +10,212 @@ APP = Path(__file__).resolve().parents[1]
 
 
 def graph_for(mode, overrides):
-    config = {"provider": {"name": "jev" if mode == "live" else "mock"},
-              "transport": {"enabled": True, "mock_audio": mode == "mock"},
-              "observation": {"include_text": True}}
-    allowed = {"turn.enabled", "start.enabled", "stop.enabled", "backchannel.enabled",
-               "start.prompt", "stop.prompt", "backchannel.prompt"}
+    config = {
+        "provider": {"name": "jev" if mode == "live" else "mock"},
+        "transport": {"enabled": True, "mock_audio": mode == "mock"},
+        "observation": {"include_text": True},
+    }
+    allowed = {
+        "turn.enabled",
+        "start.enabled",
+        "stop.enabled",
+        "backchannel.enabled",
+        "start.prompt",
+        "stop.prompt",
+        "backchannel.prompt",
+    }
     for key, value in overrides.items():
         if key not in allowed:
             raise ValueError("unsupported session override")
         if key.endswith(".enabled") and not isinstance(value, bool):
             raise ValueError("boolean required")
-        if key.endswith(".prompt") and (not isinstance(value, str) or len(value) > 2000):
+        if key.endswith(".prompt") and (
+            not isinstance(value, str) or len(value) > 2000
+        ):
             raise ValueError("prompt must be at most 2000 characters")
         section, option = key.split(".")
         config.setdefault(section, {})[option] = value
-    graph = {"nodes": [
-        {"type": "extension", "name": "turn_control", "addon": "jev_turn_control_python", "extension_group": "control", "property": config},
-        {"type": "extension", "name": "websocket_server", "addon": "websocket_server", "extension_group": "transport", "property": {"host": "127.0.0.1", "port": 8765, "sample_rate": 16000, "channels": 1, "bytes_per_sample": 2}},
-    ], "connections": [{"extension": "websocket_server", "data": [
-        {"name": name, "dest": [{"extension": "turn_control"}]} for name in ("jev_asr", "jev_control", "jev_playback")]}]}
+    graph = {
+        "nodes": [
+            {
+                "type": "extension",
+                "name": "turn_control",
+                "addon": "jev_turn_control_python",
+                "extension_group": "control",
+                "property": config,
+            },
+            {
+                "type": "extension",
+                "name": "websocket_server",
+                "addon": "websocket_server",
+                "extension_group": "transport",
+                "property": {
+                    "host": "127.0.0.1",
+                    "port": 8765,
+                    "sample_rate": 16000,
+                    "channels": 1,
+                    "bytes_per_sample": 2,
+                },
+            },
+        ],
+        "connections": [
+            {
+                "extension": "websocket_server",
+                "data": [
+                    {"name": name, "dest": [{"extension": "turn_control"}]}
+                    for name in ("jev_asr", "jev_control", "jev_playback")
+                ],
+            }
+        ],
+    }
     if mode == "live":
         graph["nodes"] += [
-            {"type": "extension", "name": "stt", "addon": "soniox_asr_python", "extension_group": "stt", "property": {
-                "url": "wss://stt-rt.soniox.com/transcribe-websocket", "sample_rate": 16000, "holding_mode": "false",
-                "params": {"api_key": "${env:SONIOX_API_KEY}", "model": "${env:SONIOX_MODEL|stt-rt-v3}", "audio_format": "pcm_s16le", "sample_rate": 16000, "num_channels": 1, "enable_endpoint_detection": True}}},
-            {"type": "extension", "name": "llm", "addon": "openai_llm2_python", "extension_group": "llm", "property": {
-                "base_url": "https://api.groq.com/openai/v1", "api_key": "${env:GROQ_API_KEY}", "model": "${env:GROQ_MODEL|openai/gpt-oss-20b}", "max_tokens": 512, "prompt": "", "greeting": "", "frequency_penalty": 0.0}},
-            {"type": "extension", "name": "tts", "addon": "cartesia_tts", "extension_group": "tts", "property": {
-                "sample_rate": 16000, "enable_words": True, "params": {"api_key": "${env:CARTESIA_API_KEY}", "base_url": "wss://api.cartesia.ai", "model_id": "${env:CARTESIA_MODEL|sonic-3}", "voice": {"mode": "id", "id": "${env:CARTESIA_VOICE_ID|a0e99841-438c-4a64-b679-ae501e7d6091}"}, "language": "en"}}},
+            {
+                "type": "extension",
+                "name": "stt",
+                "addon": "soniox_asr_python",
+                "extension_group": "stt",
+                "property": {
+                    "url": "wss://stt-rt.soniox.com/transcribe-websocket",
+                    "sample_rate": 16000,
+                    "holding_mode": "false",
+                    "params": {
+                        "api_key": "${env:SONIOX_API_KEY}",
+                        "model": "${env:SONIOX_MODEL|stt-rt-v3}",
+                        "audio_format": "pcm_s16le",
+                        "sample_rate": 16000,
+                        "num_channels": 1,
+                        "enable_endpoint_detection": True,
+                    },
+                },
+            },
+            {
+                "type": "extension",
+                "name": "llm",
+                "addon": "openai_llm2_python",
+                "extension_group": "llm",
+                "property": {
+                    "base_url": "https://api.groq.com/openai/v1",
+                    "api_key": "${env:GROQ_API_KEY}",
+                    "model": "${env:GROQ_MODEL|openai/gpt-oss-20b}",
+                    "max_tokens": 512,
+                    "prompt": "",
+                    "greeting": "",
+                    "frequency_penalty": 0.0,
+                },
+            },
+            {
+                "type": "extension",
+                "name": "tts",
+                "addon": "cartesia_tts",
+                "extension_group": "tts",
+                "property": {
+                    "sample_rate": 16000,
+                    "enable_words": True,
+                    "params": {
+                        "api_key": "${env:CARTESIA_API_KEY}",
+                        "base_url": "wss://api.cartesia.ai",
+                        "model_id": "${env:CARTESIA_MODEL|sonic-3}",
+                        "voice": {
+                            "mode": "id",
+                            "id": "${env:CARTESIA_VOICE_ID|a0e99841-438c-4a64-b679-ae501e7d6091}",
+                        },
+                        "language": "en",
+                    },
+                },
+            },
         ]
         graph["connections"] += [
-            {"extension": "websocket_server", "audio_frame": [{"name": "pcm_frame", "dest": [{"extension": "stt"}]}]},
-            {"extension": "stt", "data": [{"name": "asr_result", "dest": [{"extension": "turn_control"}]}]},
-            {"extension": "tts", "audio_frame": [{"name": "pcm_frame", "dest": [{"extension": "turn_control"}]}],
-             "data": [{"name": name, "dest": [{"extension": "turn_control"}]} for name in ("tts_audio_start", "tts_audio_end", "tts_text_result")]},
+            {
+                "extension": "websocket_server",
+                "audio_frame": [
+                    {"name": "pcm_frame", "dest": [{"extension": "stt"}]}
+                ],
+            },
+            {
+                "extension": "stt",
+                "data": [
+                    {
+                        "name": "asr_result",
+                        "dest": [{"extension": "turn_control"}],
+                    }
+                ],
+            },
+            {
+                "extension": "tts",
+                "audio_frame": [
+                    {
+                        "name": "pcm_frame",
+                        "dest": [{"extension": "turn_control"}],
+                    }
+                ],
+                "data": [
+                    {"name": name, "dest": [{"extension": "turn_control"}]}
+                    for name in (
+                        "tts_audio_start",
+                        "tts_audio_end",
+                        "tts_text_result",
+                    )
+                ],
+            },
         ]
-    return {"ten": {"predefined_graphs": [{"name": "jev_turn_control", "auto_start": True, "graph": graph}],
-                    "log": {"handlers": [{"matchers": [{"level": "error"}], "formatter": {"type": "plain", "colored": False}, "emitter": {"type": "console", "config": {"stream": "stdout"}}}]}}}
+    return {
+        "ten": {
+            "predefined_graphs": [
+                {"name": "jev_turn_control", "auto_start": True, "graph": graph}
+            ],
+            "log": {
+                "handlers": [
+                    {
+                        "matchers": [{"level": "error"}],
+                        "formatter": {"type": "plain", "colored": False},
+                        "emitter": {
+                            "type": "console",
+                            "config": {"stream": "stdout"},
+                        },
+                    }
+                ]
+            },
+        }
+    }
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=("mock", "live"), default=os.environ.get("JEV_MODE", "mock"))
-    parser.add_argument("--write-only", help="write graph without starting (no secrets included)")
+    parser.add_argument(
+        "--mode",
+        choices=("mock", "live"),
+        default=os.environ.get("JEV_MODE", "mock"),
+    )
+    parser.add_argument(
+        "--write-only",
+        help="write graph without starting (no secrets included)",
+    )
     args = parser.parse_args()
     overrides = json.loads(os.environ.get("JEV_SESSION_CONFIG", "{}"))
     graph = graph_for(args.mode, overrides)
     if args.write_only:
-        Path(args.write_only).write_text(json.dumps(graph, indent=2) + "\n")
+        Path(args.write_only).write_text(
+            json.dumps(graph, indent=2) + "\n", encoding="utf-8"
+        )
         return
     if args.mode == "live":
-        missing = [k for k in ("JEV_API_KEY", "SONIOX_API_KEY", "GROQ_API_KEY", "CARTESIA_API_KEY") if not os.environ.get(k)]
+        missing = [
+            k
+            for k in (
+                "JEV_API_KEY",
+                "SONIOX_API_KEY",
+                "GROQ_API_KEY",
+                "CARTESIA_API_KEY",
+            )
+            if not os.environ.get(k)
+        ]
         if missing:
-            raise SystemExit("Missing server credentials: " + ", ".join(missing))
+            raise SystemExit(
+                "Missing server credentials: " + ", ".join(missing)
+            )
     descriptor, path = tempfile.mkstemp(prefix="jev-session-", suffix=".json")
-    with os.fdopen(descriptor, "w") as handle:
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         json.dump(graph, handle)
     os.environ["JEV_PROPERTY_FILE"] = path
     os.execv(str(APP / "scripts/start.sh"), [str(APP / "scripts/start.sh")])

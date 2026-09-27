@@ -303,6 +303,11 @@ class JevTurnControlExtension(AsyncExtension):
             if name == "asr_result" and final:
                 self.asr_segment += 1
         elif name == "jev_playback":
+            if not isinstance(payload.get("response_id"), str) or any(
+                not isinstance(payload.get(flag, False), bool)
+                for flag in ("stopped", "completed")
+            ):
+                raise ValueError("invalid playback feedback")
             cursor = payload["played_ms"]
             if not isinstance(cursor, (int, float)) or not math.isfinite(
                 cursor
@@ -349,6 +354,7 @@ class JevTurnControlExtension(AsyncExtension):
                 }
                 for w in payload.get("words", [])
             ]
+            self.engine.now = now
             self.engine.align(rid, words)
 
     async def on_cmd(self, ten_env: AsyncTenEnv, cmd: Cmd):

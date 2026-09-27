@@ -73,7 +73,11 @@ class Config:
                 default = values[section][key]
                 if isinstance(default, bool):
                     valid = isinstance(value, bool)
-                elif isinstance(default, (int, float)):
+                elif isinstance(default, int):
+                    valid = isinstance(value, int) and not isinstance(
+                        value, bool
+                    )
+                elif isinstance(default, float):
                     valid = isinstance(value, (int, float)) and not isinstance(
                         value, bool
                     )
