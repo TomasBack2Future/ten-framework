@@ -1,0 +1,23 @@
+{
+  "executor": {
+    "enabled": false,
+    "model": "gpt-6-luna",
+    "reasoning_effort": "low",
+    "timeout": 60,
+    "max_tasks_per_session": 8,
+    "work_dir": "/work/artifacts",
+    "allowed_capabilities": [
+      "artifact"
+    ],
+    "cancel_behavior": "interrupt_no_rollback",
+    "max_artifact_bytes": 65536,
+    "max_artifacts": 4
+  },
+  "routing": {
+    "prompt_override": "",
+    "variant": "refined",
+    "execute_threshold": 0.75,
+    "timeout": 20,
+    "model": "jev-1.13.0"
+  }
+}
