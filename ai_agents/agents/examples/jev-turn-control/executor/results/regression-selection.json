@@ -1,0 +1,8 @@
+{
+  "variant": "refined",
+  "execute_threshold": 0.75,
+  "dataset_sha256": "87b34663122e928ce4be469f6cf92d84c0b626339c30cdeb500e3b305d946cf2",
+  "prompt_sha256": "3c96165bb4d3f28d40fdfcc0d1f93fc83d40d0624f3784f88193ceba93783bb3",
+  "evaluation_boundary": "exposed-regression",
+  "reason": "Freeze previous configuration; repair semantic grouping without further tuning. Fresh paired regression observations are not held-out evidence."
+}

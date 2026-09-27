@@ -1,0 +1,8 @@
+[MAIN]
+ignore=results,data
+[MESSAGES CONTROL]
+# Small stateful adapter records and fixed benchmark definitions intentionally
+# carry parallel fields and explicit cases; no package-level design framework.
+disable=too-few-public-methods,too-many-instance-attributes,too-many-locals,too-many-arguments,too-many-positional-arguments,too-many-branches,too-many-statements,duplicate-code
+[FORMAT]
+max-line-length=100
