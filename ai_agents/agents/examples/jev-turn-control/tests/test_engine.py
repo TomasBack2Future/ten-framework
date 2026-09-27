@@ -88,6 +88,10 @@ def test_high_frequency_partial_does_not_starve_or_queue():
     engine.complete_decision(request, {"start": answer()}, 1100)
     assert engine.events[-1]["type"] == "decision.discarded"
     engine.tick(1990)
+    assert not engine.responses
+    request = engine.begin_decision(1990)
+    engine.complete_decision(request, {}, 2010, error=True)
+    engine.tick(2010)
     assert len(engine.responses) == 1
     assert len(engine.events) <= 256
 
@@ -319,7 +323,7 @@ def test_main_reply_preempts_backchannel_playback():
     assert engine.responses[engine.active]["mode"] == "answer"
 
 
-def test_continuation_keeps_floor_across_long_stream_and_only_guides_once():
+def test_continuation_keeps_floor_and_guides_once_per_input_cycle():
     engine = make(scheduling={"max_wait_ms": 1000})
     for now in range(0, 8000, 200):
         engine.input(f"I am thinking about {now}", False, now)
@@ -335,15 +339,16 @@ def test_continuation_keeps_floor_across_long_stream_and_only_guides_once():
     first = engine.active
     assert first
     engine.playback(first, 200, 9000, completed=True)
-    # Another incomplete fragment must not repeat the same nudge indefinitely.
+    # New input after the nudge owns a new budget; ticks alone do not renew it.
     engine.input("I am still deciding", False, 9200)
     request = engine.begin_decision(9320)
     engine.complete_decision(request, {"start": answer("continuation")}, 9400)
     for now in range(10200, 15000, 20):
         engine.tick(now)
-    assert not engine.active
+    assert engine.active and engine.active != first
+    assert engine.input_cycle == 2
     assert (
-        len([a for a in engine.actions if a["type"] == "response.start"]) == 1
+        len([a for a in engine.actions if a["type"] == "response.start"]) == 2
     )
 
 
