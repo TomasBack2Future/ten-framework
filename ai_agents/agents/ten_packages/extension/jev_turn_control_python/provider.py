@@ -59,19 +59,23 @@ class DecisionProvider:
         self.trace = contextvars.ContextVar("decision_trace", default=None)
         self.client = None
 
-    async def decide(self, request):
+    async def decide(self, request, on_result=None):
         if self.config["provider"]["name"] == "mock":
             await asyncio.sleep(0)
-            return mock_answers(request)
+            result = mock_answers(request)
+            if on_result:
+                on_result(result)
+            return result
+
         try:
             return await asyncio.wait_for(
-                self._decide(request),
+                self._decide(request, on_result),
                 self.config["provider"]["timeout_ms"] / 1000,
             )
         except (KeyError, TypeError, AttributeError) as exc:
             raise ValueError("invalid provider response") from exc
 
-    async def _post(self, endpoint, body, secret_env, header):
+    async def _post(self, endpoint, body, secret_env, header, on_response=None):
         started = time.monotonic_ns()
         trace = self.trace.get()
         if self.evidence:
@@ -110,9 +114,9 @@ class DecisionProvider:
                         "body": data,
                     },
                 )
-            return data
+            return on_response(data) if on_response else data
 
-    async def _decide(self, request):
+    async def _decide(self, request, on_result=None):
         self.trace.set(
             {
                 key: request.get(key)
@@ -150,8 +154,15 @@ class DecisionProvider:
             if not isinstance(text, str) or not text.strip():
                 raise ValueError("invalid compressed state")
             state = {"compressed_state_text": text}
+
+        def parsed(data):
+            result = self.parse_answers(data, questions)
+            if on_result:
+                on_result(result)
+            return result
+
         if mode == "sd":
-            data = await self._post(
+            return await self._post(
                 cfg["sd_endpoint"],
                 {
                     "model": "classify-1",
@@ -160,14 +171,20 @@ class DecisionProvider:
                 },
                 cfg["sd_secret_env"],
                 "x-api-key",
+                on_response=parsed,
             )
         else:
-            data = await self._post(
+            return await self._post(
                 cfg["endpoint"],
                 {"model": cfg["model"], "state": state, "questions": questions},
                 cfg["secret_env"],
                 "Authorization",
+                on_response=parsed,
             )
+
+    @staticmethod
+    def parse_answers(data, questions):
+        """Validate before synchronously applying a result, before HTTP cleanup."""
         result = {}
         for kind, question in questions.items():
             answer = data["answers"][kind]
