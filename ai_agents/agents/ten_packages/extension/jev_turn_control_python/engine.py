@@ -350,8 +350,8 @@ class TurnEngine:
         if "start" in request["kinds"]:
             self.last_start_decided = self.revision
         self.last_decided_speaking = request["state"]["assistant_speaking"]
+        self.failed = bool(error)
         if error:
-            self.failed = True
             self.emit(
                 "error", {"code": "provider_unavailable", "recoverable": True}
             )
@@ -363,6 +363,8 @@ class TurnEngine:
             and stop.get("score", 0) >= self.config["stop"]["threshold"]
         ):
             self.mark_applied("stop")
+            # Stop wins this joint request; its start result was not applied.
+            self.last_start_decided = -1
             self.stop("user_reclaims_floor")
             self.schedule("continuation")
             return
