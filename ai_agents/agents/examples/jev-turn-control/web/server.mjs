@@ -10,6 +10,8 @@ import { WebSocketServer, WebSocket } from "ws";
 const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT || 3000),
   mode = process.env.JEV_MODE || "mock";
+const executorAvailable =
+  process.env.JEV_CODEX_ENABLED === "true" && mode === "live";
 const revision = process.env.JEV_REVISION || "development";
 const code = process.env.JEV_ACCESS_CODE || "";
 const ttl =
@@ -204,7 +206,12 @@ const server = http.createServer(async (req, res) => {
     if (req.url === "/healthz")
       return json(res, 200, { ok: true, revision, mode });
     if (req.url === "/api/config")
-      return json(res, 200, { mode, revision, authenticated: allowed(req) });
+      return json(res, 200, {
+        mode,
+        revision,
+        executor_available: executorAvailable,
+        authenticated: allowed(req),
+      });
     if (req.method === "POST") {
       if (req.headers.origin && req.headers.origin !== origin)
         return json(res, 403, { error: "Origin rejected" });
@@ -297,6 +304,7 @@ const server = http.createServer(async (req, res) => {
         const settings = request.settings || {};
         const keys = [
           "voice.prompt",
+          "executor.enabled",
           "compression.enabled",
           "compression.prompt",
           "compression.summary_prompt",
@@ -319,6 +327,7 @@ const server = http.createServer(async (req, res) => {
         for (const [k, v] of Object.entries(settings)) {
           if (
             !keys.includes(k) ||
+            (k === "executor.enabled" && v && !executorAvailable) ||
             (k.endsWith(".enabled")
               ? typeof v !== "boolean"
               : limits[k]

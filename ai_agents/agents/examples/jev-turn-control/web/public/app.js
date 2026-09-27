@@ -245,6 +245,7 @@ $("connect").onclick = async () => {
         "start.prompt": $("prompt").value,
         "voice.prompt": $("voice-prompt").value,
         "compression.enabled": $("enable-compression").checked,
+        "executor.enabled": $("enable-executor").checked,
         "compression.trigger_chars": Number($("compression-chars").value),
         "compression.keep_turns": Number($("compression-turns").value),
         "compression.timeout_ms": Number($("compression-timeout").value),
@@ -396,6 +397,10 @@ fetch("/api/config")
   .then((r) => r.json())
   .then((c) => {
     config = c;
+    $("enable-executor").disabled = !c.executor_available;
+    $("executor-availability").textContent = c.executor_available
+      ? "Codex artifacts (next call)"
+      : "Codex artifacts (unavailable)";
     $("login").hidden = c.authenticated;
     $("connect").disabled = !c.authenticated;
     $("mode").textContent =

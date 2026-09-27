@@ -17,6 +17,7 @@ def graph_for(mode, overrides):
     }
     allowed = {
         "voice.prompt",
+        "executor.enabled",
         "compression.enabled",
         "compression.prompt",
         "compression.summary_prompt",
@@ -40,11 +41,22 @@ def graph_for(mode, overrides):
             not isinstance(value, str) or len(value) > 2000
         ):
             raise ValueError("prompt must be at most 2000 characters")
-        limits = {"compression.trigger_chars": (1000, 24000),
-                  "compression.keep_turns": (1, 12),
-                  "compression.timeout_ms": (1000, 30000)}
-        if key in limits and (type(value) is not int or not limits[key][0] <= value <= limits[key][1]):
+        limits = {
+            "compression.trigger_chars": (1000, 24000),
+            "compression.keep_turns": (1, 12),
+            "compression.timeout_ms": (1000, 30000),
+        }
+        if key in limits and (
+            type(value) is not int
+            or not limits[key][0] <= value <= limits[key][1]
+        ):
             raise ValueError("numeric setting outside allowed range")
+        if (
+            key == "executor.enabled"
+            and value
+            and os.environ.get("JEV_CODEX_ENABLED") != "true"
+        ):
+            raise ValueError("executor unavailable")
         section, option = key.split(".")
         config.setdefault(section, {})[option] = value
     graph = {

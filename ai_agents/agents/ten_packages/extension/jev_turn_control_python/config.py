@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from copy import deepcopy
 
 DEFAULTS = {
+    "executor": {"enabled": False},
     "voice": {"prompt": ""},
     "compression": {
         "enabled": False,
