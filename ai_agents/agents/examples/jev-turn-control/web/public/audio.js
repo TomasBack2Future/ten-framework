@@ -66,16 +66,10 @@ export class Player {
       return false;
     const bytes = Uint8Array.from(atob(message.audio), (c) => c.charCodeAt(0));
     if (bytes.length % 2 || bytes.length > 192000) return false;
-    if (this.next - this.ctx.currentTime > 30) {
-      this.report({
-        response_id: this.response,
-        played_ms: this.cursor(),
-        stopped: true,
-        completed: false,
-        accuracy: "estimated",
-        reason: "buffer_limit",
-      });
-      this.stop();
+    const start = Math.max(this.next, this.ctx.currentTime + 0.015);
+    const duration = bytes.length / 2 / rate;
+    if (start + duration - this.ctx.currentTime > 30) {
+      this.stop(this.response, "buffer_limit");
       return false;
     }
     const view = new DataView(bytes.buffer);
@@ -86,14 +80,14 @@ export class Player {
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(this.ctx.destination);
-    const start = Math.max(this.next, this.ctx.currentTime + 0.015);
+    const id = this.response;
     this.timeline.push({ start, duration: buffer.duration });
     this.next = start + buffer.duration;
     this.sources.add(source);
     source.onended = () => {
       this.sources.delete(source);
       source.disconnect();
-      this.checkComplete();
+      if (this.response === id) this.checkComplete();
     };
     source.start(start);
     return true;
@@ -113,6 +107,15 @@ export class Player {
     this.completionTimer = setTimeout(
       () => {
         if (this.response !== id || this.sources.size) return;
+        // onended refers to the rendering timeline. Wait for the same latency-
+        // compensated clock used by progress/stop before declaring completion.
+        const total = Math.round(
+          this.timeline.reduce((n, x) => n + x.duration, 0) * 1000,
+        );
+        if (this.cursor() < total) {
+          this.checkComplete();
+          return;
+        }
         this.report({
           response_id: id,
           played_ms: this.cursor(),
@@ -124,15 +127,24 @@ export class Player {
         this.response = null;
         this.timeline = [];
       },
-      this.timeline.length ? 150 : 500,
+      this.timeline.length
+        ? Math.max(
+            150,
+            Math.ceil(
+              (this.next + this.latency() - this.ctx.currentTime) * 1000,
+            ),
+          )
+        : 500,
     );
+  }
+  latency() {
+    const seconds = this.ctx?.outputLatency || this.ctx?.baseLatency || 0;
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
   }
   cursor() {
     if (!this.ctx) return 0;
     // AudioContext time measures scheduling, not acoustic delivery. Label estimated.
-    const now =
-      this.ctx.currentTime -
-      (this.ctx.outputLatency || this.ctx.baseLatency || 0);
+    const now = this.ctx.currentTime - this.latency();
     return Math.round(
       this.timeline.reduce(
         (n, x) => n + Math.max(0, Math.min(x.duration, now - x.start)),
@@ -150,7 +162,7 @@ export class Player {
         accuracy: "estimated",
       });
   }
-  stop(id = this.response) {
+  stop(id = this.response, reason) {
     if (id) {
       this.blocked.add(id);
       if (this.blocked.size > 100)
@@ -158,14 +170,25 @@ export class Player {
     }
     if (id !== this.response) return;
     clearTimeout(this.completionTimer);
+    const terminal = id
+      ? {
+          response_id: id,
+          played_ms: this.cursor(),
+          stopped: true,
+          completed: false,
+          accuracy: "estimated",
+          ...(reason ? { reason } : {}),
+        }
+      : null;
+    // Fence synchronous or delayed onended callbacks before stopping sources.
+    this.response = null;
     for (const source of this.sources) {
       source.stop();
       source.disconnect();
     }
     this.sources.clear();
-    this.progress(true);
-    this.response = null;
     this.timeline = [];
+    if (terminal) this.report(terminal);
   }
   async destroy() {
     this.stop();

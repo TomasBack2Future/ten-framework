@@ -27,6 +27,10 @@ from .provider import DecisionProvider
 from .memory import summarize, voice_request
 
 
+class EmptyGenerationError(RuntimeError):
+    """The provider ended without usable text; safe to retry before output."""
+
+
 class JevTurnControlExtension(AsyncExtension):
     def __init__(self, name):
         super().__init__(name)
@@ -245,15 +249,25 @@ class JevTurnControlExtension(AsyncExtension):
                 try:
                     await self.generate_live(action)
                     return
-                except Exception:
+                except Exception as exc:
                     if rid != self.engine.active:
                         return
                     self.engine.emit(
                         "generation.failed",
-                        {"attempt": attempt + 1, "code": "llm_request_failed"},
+                        {
+                            "attempt": attempt + 1,
+                            "code": (
+                                "llm_empty_output"
+                                if isinstance(exc, EmptyGenerationError)
+                                else "llm_request_failed"
+                            ),
+                        },
                         rid,
                     )
-                    if self.engine.responses[rid]["text"]:
+                    if (
+                        self.engine.responses[rid]["text"].strip()
+                        or self.engine.responses[rid]["audio_ms"] > 0
+                    ):
                         raise
                     if attempt == 0:
                         self.engine.emit(
@@ -308,6 +322,8 @@ class JevTurnControlExtension(AsyncExtension):
         command.set_dests([Loc("", "", "llm")])
         command.set_property_from_json(None, json.dumps(request))
         fragment = ""
+        generated = ""
+        done = False
         async for result, error in self.ten_env.send_cmd_ex(command):
             if rid != self.engine.active:
                 return
@@ -321,8 +337,9 @@ class JevTurnControlExtension(AsyncExtension):
                 text = response.delta or ""
                 if not self.engine.output(rid, text, self.now()):
                     return
+                generated += text
                 fragment += text
-                if (
+                if fragment.strip() and (
                     any(
                         mark in fragment
                         for mark in (".", "?", "!", "。", "？", "！")
@@ -332,9 +349,22 @@ class JevTurnControlExtension(AsyncExtension):
                     await self.tts(rid, fragment, False)
                     fragment = ""
             elif isinstance(response, LLMResponseMessageDone):
+                if not generated.strip():
+                    text = response.content or ""
+                    if not text.strip():
+                        raise EmptyGenerationError("empty LLM response")
+                    if not self.engine.output(rid, text, self.now()):
+                        return
+                    generated = text
+                    fragment = text
+                done = True
                 self.engine.output(rid, "", self.now(), final=True)
                 await self.tts(rid, fragment, True)
                 fragment = ""
+        if not done:
+            if not generated.strip():
+                raise EmptyGenerationError("empty LLM stream")
+            raise RuntimeError("incomplete LLM stream")
         # Agent EOS is never used as input turn completion.
 
     async def tts(self, rid, text, final):
@@ -462,8 +492,18 @@ class JevTurnControlExtension(AsyncExtension):
             if action == "snapshot":
                 self.engine.snapshot()
             elif action == "stop":
+                rid = payload.get("response_id")
+                reason = (
+                    "buffer_limit"
+                    if payload.get("reason") == "buffer_limit"
+                    else "manual_stop"
+                )
+                if (
+                    rid is not None or reason == "buffer_limit"
+                ) and rid != self.engine.active:
+                    return
                 self.engine.now = now
-                self.engine.stop("manual_stop")
+                self.engine.stop(reason)
             elif action == "pause":
                 self.engine.pause(now)
             elif action == "resume":

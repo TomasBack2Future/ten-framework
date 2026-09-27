@@ -22,7 +22,11 @@ const send = (data) => {
 const control = (data) => send({ type: "data", name: "jev_control", data });
 const player = new Player((data) => {
   if (data.reason === "buffer_limit") {
-    control({ action: "stop" });
+    control({
+      action: "stop",
+      reason: "buffer_limit",
+      response_id: data.response_id,
+    });
     fail("Playback buffer limit reached; output stopped.");
   }
   if (!send({ type: "data", name: "jev_playback", data }) && data.stopped) {
