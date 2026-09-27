@@ -1,0 +1,197 @@
+[
+  {
+    "seq": 762,
+    "input_revision": 155,
+    "response_id": "session-r2",
+    "type": "response.started",
+    "payload": {
+      "reason": "timer_or_decision"
+    }
+  },
+  {
+    "seq": 1475,
+    "input_revision": 187,
+    "response_id": null,
+    "type": "decision.started",
+    "payload": {
+      "decision_kind": "stop"
+    }
+  },
+  {
+    "seq": 1477,
+    "input_revision": 187,
+    "response_id": "session-r2",
+    "type": "decision.completed",
+    "payload": {
+      "decision_kind": "stop",
+      "label": "stop",
+      "applied": true,
+      "discard_reason": ""
+    }
+  },
+  {
+    "seq": 1478,
+    "input_revision": 187,
+    "response_id": "session-r2",
+    "type": "decision.applied",
+    "payload": {
+      "decision_kind": "stop"
+    }
+  },
+  {
+    "seq": 1479,
+    "input_revision": 187,
+    "response_id": "session-r2",
+    "type": "response.cancelled",
+    "payload": {
+      "reason": "user_reclaims_floor",
+      "awaiting_playback_ack": true
+    }
+  },
+  {
+    "seq": 1485,
+    "input_revision": 188,
+    "response_id": "session-r2",
+    "type": "playback.stopped",
+    "payload": {
+      "confirmed": true,
+      "completed": false
+    }
+  },
+  {
+    "seq": 1486,
+    "input_revision": 188,
+    "response_id": null,
+    "type": "decision.started",
+    "payload": {
+      "decision_kind": "start"
+    }
+  },
+  {
+    "seq": 1487,
+    "input_revision": 188,
+    "response_id": null,
+    "type": "decision.started",
+    "payload": {
+      "decision_kind": "backchannel"
+    }
+  },
+  {
+    "seq": 1489,
+    "input_revision": 189,
+    "response_id": null,
+    "type": "decision.discarded",
+    "payload": {
+      "decision_kind": "start",
+      "label": "continuation",
+      "applied": false,
+      "discard_reason": "input_revision"
+    }
+  },
+  {
+    "seq": 1490,
+    "input_revision": 189,
+    "response_id": null,
+    "type": "decision.discarded",
+    "payload": {
+      "decision_kind": "backchannel",
+      "label": "silent",
+      "applied": false,
+      "discard_reason": "input_revision"
+    }
+  },
+  {
+    "seq": 1491,
+    "input_revision": 189,
+    "response_id": null,
+    "type": "decision.started",
+    "payload": {
+      "decision_kind": "start"
+    }
+  },
+  {
+    "seq": 1492,
+    "input_revision": 189,
+    "response_id": null,
+    "type": "decision.started",
+    "payload": {
+      "decision_kind": "backchannel"
+    }
+  },
+  {
+    "seq": 2111,
+    "input_revision": 326,
+    "response_id": null,
+    "type": "input.consumed",
+    "payload": {
+      "reason": "explicit_wait"
+    }
+  },
+  {
+    "seq": 2130,
+    "input_revision": 332,
+    "response_id": "session-r4",
+    "type": "response.started",
+    "payload": {
+      "reason": "timer_or_decision"
+    }
+  },
+  {
+    "seq": 2580,
+    "input_revision": 338,
+    "response_id": "session-r4",
+    "type": "response.cancelled",
+    "payload": {
+      "reason": "stop_maximum_wait",
+      "awaiting_playback_ack": true
+    }
+  },
+  {
+    "seq": 2585,
+    "input_revision": 338,
+    "response_id": "session-r4",
+    "type": "playback.stopped",
+    "payload": {
+      "confirmed": true,
+      "completed": false
+    }
+  },
+  {
+    "seq": 2595,
+    "input_revision": 338,
+    "response_id": "session-r6",
+    "type": "response.started",
+    "payload": {
+      "reason": "timer_or_decision"
+    }
+  },
+  {
+    "seq": 2681,
+    "input_revision": 343,
+    "response_id": "session-r6",
+    "type": "response.cancelled",
+    "payload": {
+      "reason": "user_reclaims_floor",
+      "awaiting_playback_ack": true
+    }
+  },
+  {
+    "seq": 2685,
+    "input_revision": 343,
+    "response_id": "session-r6",
+    "type": "playback.stopped",
+    "payload": {
+      "confirmed": true,
+      "completed": false
+    }
+  },
+  {
+    "seq": 2695,
+    "input_revision": 343,
+    "response_id": "session-r8",
+    "type": "response.started",
+    "payload": {
+      "reason": "timer_or_decision"
+    }
+  }
+]

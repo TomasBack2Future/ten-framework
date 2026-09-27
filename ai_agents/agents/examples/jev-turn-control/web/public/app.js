@@ -98,6 +98,7 @@ function apply(e) {
   if (!store.apply(e)) return;
   renderEvent(e);
   workflow.apply(e);
+  status(workflow.status);
   renderWorkflow();
   $("revision").textContent = `Input revision ${e.input_revision}`;
   const p = e.payload || {};
@@ -119,7 +120,6 @@ function apply(e) {
   if (e.type === "state.snapshot") {
     // Restore labels only: NEVER replay response.started or audio from a snapshot.
     player.stop();
-    status(p.mode ? `${p.mode} · connected` : "Connected · restored");
     if (p.input_text || p.transcript || p.text)
       $("transcript").textContent = p.input_text || p.transcript || p.text;
     if (p.context)
@@ -139,7 +139,6 @@ function apply(e) {
   }
   if (e.type === "response.started") {
     player.begin(e.response_id);
-    status("Responding");
   }
   if (e.type === "context.capacity")
     fail(
@@ -151,7 +150,6 @@ function apply(e) {
     player.audioComplete(e.response_id);
   if (e.type === "response.cancelled") {
     player.stop(e.response_id);
-    status("Listening · output cancelled");
   }
   if (e.type.startsWith("playback.") && p.heard_text !== undefined)
     $("heard").textContent =
