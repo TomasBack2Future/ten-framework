@@ -1,0 +1,30 @@
+{
+  "reviewed_baseline": "9b510fc4946765e291a9ed5adb63ccb04faba233",
+  "local_tests": {
+    "passed": 26,
+    "total": 26
+  },
+  "ubuntu_offline_core_tests": {
+    "passed": 23,
+    "total": 23,
+    "python": "3.10",
+    "network": "none"
+  },
+  "black": "passed",
+  "pylint": 10.0,
+  "mocked_protocol_comparisons_against_baseline": {
+    "passed": 4,
+    "variants": [
+      "baseline",
+      "refined"
+    ],
+    "providers": [
+      "jev",
+      "scaledown"
+    ]
+  },
+  "previous_manifest_hashes": "all_preserved",
+  "materialized_80_row_dataset_and_v2_lock": "validated_without_api",
+  "paid_evaluation_rerun": false,
+  "live_codex": "not_run_missing_authorized_credential"
+}

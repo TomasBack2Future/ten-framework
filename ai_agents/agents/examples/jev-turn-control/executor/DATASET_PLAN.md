@@ -51,8 +51,12 @@ multi_turn_miss_param_1 turn 3 is missing its line count: earlier turns 0–2
 identify log.txt but supply no count; the later clarification is excluded.
 
 Jev and ScaleDown always use identical IDs/context. Non-dev evaluation requires
-a selection lock binding dataset SHA256, prompt SHA256, variant, threshold and
-exposure boundary. Conflicting CLI overrides fail before key reads/API calls.
+a v2 selection lock binding dataset SHA256, the complete decision-spec SHA256
+(instructions, route/support criteria, model/request settings, input projection,
+threshold and timeout), variant and exposure boundary. Legacy prompt-only locks
+remain unchanged for audit and cannot authorize new runs. The prospective v2
+migration records source-known settings; it does not attest historical runs or
+resolve unknown provider model/compression defaults. Conflicting CLI overrides fail before key reads/API calls.
 Errors stay in denominators; USD costs stay unknown unless billing is available.
 
 ## Dataset suitability and deferred scope

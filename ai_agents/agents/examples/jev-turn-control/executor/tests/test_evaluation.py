@@ -1,16 +1,20 @@
 """Regression protection for family grouping, selection locks and ablation."""
 
+import asyncio
 import hashlib
 import json
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from executor.ablation import score_turn
 from executor.build_dataset import authored
-from executor.evaluate import resolve_config
-from executor.routing import REFINED
+from executor.evaluate import resolve_config, run
+from executor.config import RoutingConfig
+from executor import routing
+from executor.routing import Router, decision_spec, spec_sha256
 
 
 class EvaluationTests(unittest.TestCase):
@@ -60,13 +64,15 @@ class EvaluationTests(unittest.TestCase):
             lock.write_text(
                 json.dumps(
                     {
+                        "schema_version": 2,
+                        "decision_spec": decision_spec(RoutingConfig()),
+                        "decision_spec_sha256": spec_sha256(
+                            decision_spec(RoutingConfig())
+                        ),
                         "variant": "refined",
                         "execute_threshold": 0.75,
                         "dataset_sha256": hashlib.sha256(
                             data.read_bytes()
-                        ).hexdigest(),
-                        "prompt_sha256": hashlib.sha256(
-                            REFINED.encode()
                         ).hexdigest(),
                         "evaluation_boundary": "unseen-holdout",
                     }
@@ -89,13 +95,13 @@ class EvaluationTests(unittest.TestCase):
                 resolve_config(args)
             args.variant = None
             selection = json.loads(lock.read_text())
-            selection["prompt_sha256"] = "wrong"
+            selection["decision_spec_sha256"] = "wrong"
             lock.write_text(json.dumps(selection))
             with self.assertRaises(ValueError):
                 resolve_config(args)
-            selection["prompt_sha256"] = hashlib.sha256(
-                REFINED.encode()
-            ).hexdigest()
+            selection["decision_spec_sha256"] = spec_sha256(
+                decision_spec(RoutingConfig())
+            )
             selection["evaluation_boundary"] = "exposed-regression"
             lock.write_text(json.dumps(selection))
             with self.assertRaises(ValueError):
@@ -108,3 +114,180 @@ class EvaluationTests(unittest.TestCase):
             args.selection_lock = None
             with self.assertRaises(ValueError):
                 resolve_config(args)
+
+    def test_changed_spec_rejected_before_provider_or_key_access(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data, lock = root / "data", root / "lock"
+            data.write_text(
+                json.dumps(
+                    {
+                        "split": "regression-test",
+                        "evaluation_boundary": "exposed-regression",
+                    }
+                )
+                + "\n"
+            )
+            spec = decision_spec(RoutingConfig())
+            selection = {
+                "schema_version": 2,
+                "variant": "refined",
+                "execute_threshold": 0.75,
+                "dataset_sha256": hashlib.sha256(data.read_bytes()).hexdigest(),
+                "evaluation_boundary": "exposed-regression",
+                "decision_spec": spec,
+                "decision_spec_sha256": spec_sha256(spec),
+            }
+            lock.write_text(json.dumps(selection))
+            args = SimpleNamespace(
+                split="regression",
+                dataset=data,
+                selection_lock=lock,
+                variant=None,
+                threshold=None,
+                model=None,
+                jev_key=root / "absent",
+                scaledown_key=root / "absent",
+                output=root / "output",
+            )
+            mutations = [
+                patch.dict(routing.ROUTES, execute="changed route rubric"),
+                patch.dict(routing.SUPPORT, supported="changed support rubric"),
+                patch.object(routing, "REFINED", "changed instructions"),
+                patch.object(routing, "SCALEDOWN_MULTI_LABEL", True),
+                patch.object(
+                    routing, "JEV_ENDPOINT", "https://example.invalid"
+                ),
+                patch.object(
+                    routing, "INPUT_PROJECTION", [("text", "changed default")]
+                ),
+                patch.object(args, "model", "different-model"),
+            ]
+            for mutation in mutations:
+                with mutation, patch(
+                    "executor.evaluate.Router"
+                ) as constructor, patch("executor.routing._post") as post:
+                    with self.assertRaisesRegex(ValueError, "decision spec"):
+                        asyncio.run(run(args))
+                    constructor.assert_not_called()
+                    post.assert_not_called()
+            selection.pop("schema_version")
+            lock.write_text(json.dumps(selection))
+            with self.assertRaisesRegex(ValueError, "legacy"):
+                resolve_config(args)
+            selection["schema_version"] = 2
+            selection["decision_spec"]["transport"]["timeout_seconds"] = 999
+            lock.write_text(json.dumps(selection))
+            with self.assertRaisesRegex(ValueError, "decision spec"):
+                resolve_config(args)
+            with self.assertRaisesRegex(ValueError, "decision spec"):
+                Router("jev", root / "absent", expected_spec_sha256="incorrect")
+
+    def test_effective_settings_are_fingerprinted(self):
+        original = spec_sha256(decision_spec(RoutingConfig()))
+        for override in (
+            {"model": "other"},
+            {"prompt_override": "other"},
+            {"execute_threshold": 0.8},
+            {"timeout": 7},
+            {"variant": "baseline"},
+        ):
+            self.assertNotEqual(
+                original, spec_sha256(decision_spec(RoutingConfig(**override)))
+            )
+        spec = decision_spec(RoutingConfig())
+        scaledown = spec["providers"]["scaledown"]
+        self.assertEqual(
+            scaledown["model_selection"],
+            {"mode": "omitted_provider_default", "resolved_id": None},
+        )
+        self.assertEqual(scaledown["compression"]["server"], "unknown")
+        self.assertEqual(
+            scaledown["compression"]["request_selector"], "omitted"
+        )
+
+    def test_requests_use_locked_snapshot_and_preserve_protocol(self):
+        with tempfile.TemporaryDirectory() as directory:
+            key = Path(directory) / "key"
+            key.write_text("fake-test-key")
+            config = RoutingConfig()
+            spec = decision_spec(config)
+            routers = [
+                Router(provider, key, config, spec_sha256(spec))
+                for provider in ("jev", "scaledown")
+            ]
+            sample = {
+                "input": {"text": "你好", "gold": "must not leak"},
+                "gold": "must not leak",
+            }
+            state = routing.model_input(sample)
+            calls = []
+
+            def post(url, body, headers, timeout):
+                calls.append((url, body, timeout))
+                if "questions" in body:
+                    return {
+                        "answers": {
+                            name: {
+                                "probabilities": {
+                                    k: float(i == 0)
+                                    for i, k in enumerate(labels)
+                                }
+                            }
+                            for name, labels in (
+                                ("route", routing.ROUTES),
+                                ("support", routing.SUPPORT),
+                            )
+                        }
+                    }
+                return {
+                    "scores": {
+                        label["name"]: float(i == 0)
+                        for i, label in enumerate(body["labels"])
+                    }
+                }
+
+            with patch.dict(
+                routing.ROUTES, execute="mutated after snapshot"
+            ), patch.object(routing, "REFINED", "mutated"), patch(
+                "executor.routing._post", side_effect=post
+            ):
+                results = [
+                    asyncio.run(router.classify(sample)) for router in routers
+                ]
+            self.assertEqual(
+                calls[0][1],
+                {
+                    "model": config.model,
+                    "state": state,
+                    "questions": spec["providers"]["jev"]["request"][
+                        "questions"
+                    ],
+                },
+            )
+            actual = sorted(
+                (json.dumps(body, sort_keys=True) for _, body, _ in calls[1:])
+            )
+            expected = sorted(
+                json.dumps(
+                    {
+                        "text": json.dumps(state, ensure_ascii=False),
+                        **request["body"],
+                    },
+                    sort_keys=True,
+                )
+                for request in spec["providers"]["scaledown"]["requests"]
+            )
+            self.assertEqual(actual, expected)
+            self.assertTrue(
+                all(timeout == config.timeout for _, _, timeout in calls)
+            )
+            self.assertTrue(
+                all(
+                    result["decision_spec_sha256"] == spec_sha256(spec)
+                    for result in results
+                )
+            )
+            self.assertTrue(
+                all(result["route"] == "conversation" for result in results)
+            )

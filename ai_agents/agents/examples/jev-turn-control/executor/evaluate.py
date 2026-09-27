@@ -10,7 +10,7 @@ from pathlib import Path
 import statistics
 
 from .config import RoutingConfig
-from .routing import Router, ROUTES, BASELINE, REFINED
+from .routing import Router, ROUTES, decision_spec, spec_sha256
 
 
 def metrics(rows):
@@ -56,17 +56,26 @@ def metrics(rows):
 
 
 def resolve_config(args):
-    """Freeze all non-dev evaluations to a dataset and prompt selection lock."""
+    """Freeze all non-dev evaluations to a dataset and complete decision spec."""
     if args.split == "dev":
         return RoutingConfig(
             variant=args.variant or "baseline",
             execute_threshold=(
                 args.threshold if args.threshold is not None else 0.65
             ),
+            **(
+                {"model": args.model}
+                if getattr(args, "model", None) is not None
+                else {}
+            ),
         )
     if args.selection_lock is None:
         raise ValueError("non-dev evaluation requires --selection-lock")
     lock = json.loads(args.selection_lock.read_text())
+    if lock.get("schema_version") != 2:
+        raise ValueError(
+            "legacy selection lock is audit-only; explicit v2 migration required"
+        )
     digest = hashlib.sha256(args.dataset.read_bytes()).hexdigest()
     if digest != lock["dataset_sha256"]:
         raise ValueError("dataset does not match selection lock")
@@ -86,10 +95,22 @@ def resolve_config(args):
         raise ValueError("variant conflicts with selection lock")
     if args.threshold is not None and args.threshold != threshold:
         raise ValueError("threshold conflicts with selection lock")
-    prompt = REFINED if variant == "refined" else BASELINE
-    if lock.get("prompt_sha256") != hashlib.sha256(prompt.encode()).hexdigest():
-        raise ValueError("prompt does not match selection lock")
-    return RoutingConfig(variant=variant, execute_threshold=threshold)
+    config = RoutingConfig(
+        variant=variant,
+        execute_threshold=threshold,
+        **(
+            {"model": args.model}
+            if getattr(args, "model", None) is not None
+            else {}
+        ),
+    )
+    expected = lock.get("decision_spec_sha256")
+    if (
+        spec_sha256(lock["decision_spec"]) != expected
+        or spec_sha256(decision_spec(config)) != expected
+    ):
+        raise ValueError("decision spec does not match selection lock")
+    return config
 
 
 async def run(args):
@@ -114,9 +135,22 @@ async def run(args):
         raise ValueError(
             "legacy/exposed samples cannot be called an unseen holdout"
         )
+    spec = decision_spec(config)
+    expected = (
+        spec_sha256(spec)
+        if args.split == "dev"
+        else json.loads(args.selection_lock.read_text())["decision_spec_sha256"]
+    )
     routers = {
-        "jev": Router("jev", args.jev_key, config),
-        "scaledown": Router("scaledown", args.scaledown_key, config),
+        "jev": Router(
+            "jev", args.jev_key, config, expected_spec_sha256=expected
+        ),
+        "scaledown": Router(
+            "scaledown",
+            args.scaledown_key,
+            config,
+            expected_spec_sha256=expected,
+        ),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     if args.output.exists():
@@ -133,6 +167,14 @@ async def run(args):
                     "split": sample["split"],
                     "kind": sample["kind"],
                     "provider": provider,
+                    "decision_spec_schema_version": spec["schema_version"],
+                    "decision_spec_sha256": expected,
+                    "provider_model_selection": spec["providers"][provider][
+                        "model_selection"
+                    ],
+                    "provider_compression": spec["providers"][provider][
+                        "compression"
+                    ],
                     "variant": config.variant,
                     "evaluation_boundary": sample.get(
                         "evaluation_boundary", "legacy-unverified"
@@ -167,6 +209,9 @@ async def run(args):
     ).hexdigest()
     summary["split"], summary["variant"] = args.split, config.variant
     summary["execute_threshold"] = config.execute_threshold
+    summary["selection_lock_schema_version"] = 2
+    summary["decision_spec"] = spec
+    summary["decision_spec_sha256"] = expected
     summary["evaluation_boundary"] = (
         "exposed-regression"
         if args.split.startswith("regression")
@@ -189,6 +234,9 @@ def main():
     )
     parser.add_argument("--variant", choices=("baseline", "refined"))
     parser.add_argument("--threshold", type=float)
+    parser.add_argument(
+        "--model", help="Jev model override; must match non-dev decision spec"
+    )
     parser.add_argument("--selection-lock", type=Path)
     parser.add_argument("--jev-key", type=Path, required=True)
     parser.add_argument("--scaledown-key", type=Path, required=True)

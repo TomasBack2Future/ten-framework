@@ -56,3 +56,21 @@ original test_adapter.py. `task test` additionally needs requirements-sdk.txt.
 The Web integration owner must replace/cherry-pick the reviewed executor change
 before the user's combined merge/deploy gate. The final SHA requires Grok
 re-review; this fix submission does not bypass that gate or claim deployment.
+
+## Narrow re-review P3: complete decision-spec lock
+
+The prompt-only checksum omitted criteria and model selection. The v2 lock now
+binds the effective instructions, both criteria sets, model/request settings,
+input projection, label/tie order, threshold and timeout. Router requests use
+the same detached spec that is hashed. Conflicting configuration fails before
+key access or API calls; future observations include the digest and provider
+model/compression selection. ScaleDown server defaults remain explicitly unknown.
+
+`results/regression-selection.json` and every previous observation/summary remain
+byte-identical. The separate `regression-selection.v2.json` is a prospective,
+source-reconstructed migration from 9b510fc, not a runtime attestation for old
+results. No paid evaluation was rerun. New tests cover criteria/model/instruction
+and request-setting drift, snapshot/request binding, legacy rejection and
+tampered specs. Validation: 26 local tests and 23 Ubuntu Python 3.10 offline core
+tests, plus formatting and pylint. Merge/deployment still requires narrow review
+of the new exact commit.

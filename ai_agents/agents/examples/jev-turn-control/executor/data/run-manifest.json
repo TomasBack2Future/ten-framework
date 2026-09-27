@@ -28,6 +28,8 @@
     "results/regression-selection.json": "ec501ad13ef3d7f29b6e202107bac701353b19ba4bc82850b15cf7557ee3aea1",
     "results/review-validation.json": "9e68c69f24da8126cc218049633539c4551b35aab852921a86f6ba2717927169",
     "results/sandbox-fake.jsonl": "347b2e290a0f10bd5ae4c62335e929d73c8ce915ba8b17123f16d92a96816342",
-    "results/streaming-fake.json": "eb1ebadcda8c271d3dc8f01623e2bdec6e0c0bd533d1d1c0f5ec52cbce236b1c"
+    "results/streaming-fake.json": "eb1ebadcda8c271d3dc8f01623e2bdec6e0c0bd533d1d1c0f5ec52cbce236b1c",
+    "results/regression-selection.v2.json": "9ec8205c9f1836c92812f4bc82ce539efb999c34b6c9129af565e15ad5c66213",
+    "results/spec-lock-validation.json": "c3c95a1fb73ac61741e93aac4613842a396950b020a5293454f9c1b1284a0f08"
   }
 }

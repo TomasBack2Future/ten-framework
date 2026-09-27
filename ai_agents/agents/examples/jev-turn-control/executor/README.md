@@ -116,20 +116,26 @@ python3 -m executor.evaluate --dataset executor/.routing.jsonl --split dev \
 ```
 
 The existing 80 pilot examples are all exposed. Their original holdout claim
-was withdrawn after semantic-family review (see DATASET_PLAN.md). Reproduce the
-reviewed paired regression, using the frozen selection file and regenerated
+was withdrawn after semantic-family review (see DATASET_PLAN.md). For future paired regression runs, use the v2 selection file and regenerated
 `.routing.jsonl` whose hash must match:
 
 ```sh
 python3 -m executor.evaluate --dataset executor/.routing.jsonl --split regression \
-  --selection-lock executor/results/regression-selection.json \
+  --selection-lock executor/results/regression-selection.v2.json \
   --jev-key /secure/jev-key --scaledown-key /secure/scaledown-key \
   --output /tmp/regression-paired.jsonl
 ```
 
 Non-dev runs require a selection lock; omitted variant/threshold are read from
-it. Overrides conflicting with the lock or dataset/prompt checksum fail before
-API calls. `locked-test` additionally requires unseen-holdout metadata on both
+it. The complete decision spec binds effective instructions, route/support
+rubrics, model selection, request settings, input projection, threshold and
+timeout; requests are built from that same frozen snapshot. Conflicts fail
+before key reads/API calls. Future rows and summaries record the spec hash and
+provider model/compression selection, including unknown server defaults.
+Legacy prompt-only locks are audit-only and rejected; the separate v2 migration
+records known source configuration prospectively, without changing or attesting
+historical observations. ScaleDown omits model/compression selectors, so its
+resolved server settings cannot be pinned or inferred. `locked-test` additionally requires unseen-holdout metadata on both
 the lock and samples; legacy/exposed pilot data is rejected. A new holdout must
 be collected independently; regrouping or relabeling these samples is not enough.
 
@@ -142,7 +148,7 @@ cannot establish Codex success, speed, cost savings or a routing benefit.
 
 See DATASET_PLAN.md, data/bfcl-manifest.json, results/*.jsonl and REPORT.md.
 
-Reviewed CI: `task test-core` runs all 20 stdlib core/evaluation tests without
+Reviewed CI: `task test-core` runs all 23 stdlib core/evaluation tests without
 SDK installation; `task test` runs all 23 including the SDK contracts. The
 ablation now reports terminal_state_success and dispatch_policy_success
 separately; unexpected dispatch fails combined success even if no file changed.
