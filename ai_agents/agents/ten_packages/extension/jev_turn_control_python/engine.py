@@ -2,6 +2,7 @@
 
 from collections import deque
 from copy import deepcopy
+import math
 
 from .config import Config
 
@@ -418,6 +419,10 @@ class TurnEngine:
             "precision": "unknown",
             "generation_done": False,
             "audio_done": False,
+            "audio_end_received": False,
+            "audio_failed": False,
+            "expected_audio_ms": None,
+            "unverified_completion": False,
             "audio_ms": 0,
             "fully_played": False,
         }
@@ -488,13 +493,40 @@ class TurnEngine:
         )
         return True
 
-    def audio(self, rid, duration_ms=0, completed=False, timestamp=None):
+    def audio(
+        self,
+        rid,
+        duration_ms=0,
+        completed=False,
+        timestamp=None,
+        expected_ms=None,
+        normal=True,
+    ):
         response = self.responses.get(rid)
         if response is not None:
             if timestamp is not None and response["audio_origin_ms"] is None:
                 response["audio_origin_ms"] = timestamp - response["audio_ms"]
             response["audio_ms"] += duration_ms
-            response["audio_done"] = response["audio_done"] or completed
+            if completed:
+                valid = (
+                    normal
+                    and isinstance(expected_ms, (int, float))
+                    and not isinstance(expected_ms, bool)
+                    and math.isfinite(expected_ms)
+                    and 0 < expected_ms <= 3600000
+                )
+                if response["audio_end_received"]:
+                    valid = (
+                        valid
+                        and response["audio_done"]
+                        and expected_ms == response["expected_audio_ms"]
+                    )
+                response["audio_done"] = valid
+                response["audio_end_received"] = True
+                response["audio_failed"] = (
+                    response["audio_failed"] or not normal
+                )
+                response["expected_audio_ms"] = expected_ms if valid else None
             if (
                 response["pending_alignment"]
                 and response["audio_origin_ms"] is not None
@@ -518,6 +550,8 @@ class TurnEngine:
                 ),
                 "provider_alignment_browser_cursor",
             )
+        if response["audio_failed"] or response["unverified_completion"]:
+            return "", "unverified_completion"
         count = int(
             response["played_ms"]
             / 1000
@@ -617,7 +651,7 @@ class TurnEngine:
         if rid not in self.responses or rid not in (self.active, self.stopping):
             return
         response = self.responses[rid]
-        cursor = min(max(0, played_ms), 3600000)
+        cursor = min(max(0, played_ms), response["audio_ms"] or 3600000)
         response["played_ms"] = (
             cursor
             if confirmed and (stopped or completed)
@@ -630,7 +664,14 @@ class TurnEngine:
             and response["generation_done"]
             and response["audio_done"]
             and response["audio_ms"] > 0
+            # Provider duration and forwarded PCM duration are both milliseconds.
+            # 2 ms covers integer rounding, not missing audio chunks.
+            and response["expected_audio_ms"] is not None
+            and abs(response["audio_ms"] - response["expected_audio_ms"]) <= 2
             and response["played_ms"] >= response["audio_ms"] - 30
+        )
+        response["unverified_completion"] = (
+            completed and not response["fully_played"]
         )
         heard, precision = self.heard(response)
         response["precision"] = precision

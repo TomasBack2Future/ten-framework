@@ -48,3 +48,15 @@ follow review → fixes → review of final SHA → merge all three PRs → one 
 - The turn timing/continuation/maximum-wait policy is owned by PR3. Executor stays
   disabled and its review fixes are owned by PR2. This candidate must not be treated
   as the final integrated release until both are merged and rechecked.
+
+## Integrity follow-up after afce67d
+
+Self-review found and repaired two additional edges: abnormal TTS end could permit
+full-text commitment, and an unexpected summary shape could strand the job slot.
+Normal TTS end now requires explicit positive provider duration within 2 ms of
+forwarded PCM; abnormal/missing/mismatched end retains only aligned heard words,
+otherwise no guessed completion text. Tests cover partial audio then ERROR with
+LLM done, INTERRUPTED, missing duration, no audio, mismatch, duplicate and late end.
+Summary shape validation plus guaranteed job cleanup covers empty choices, missing
+message/content, timeout, unexpected exception and propagated cancellation; originals
+remain and cooldown-bounded subsequent scheduling works.

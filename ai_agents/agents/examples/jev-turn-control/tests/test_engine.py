@@ -150,7 +150,7 @@ def test_estimate_never_claims_exact():
     engine = make()
     rid = start(engine)
     engine.output(rid, "abcdefghijklmnopqrstuvwxyz", 500)
-    engine.playback(rid, 500, 1000, completed=True)
+    engine.playback(rid, 500, 1000, stopped=True)
     assert engine.history[-1]["text"] == "abcdefg"
     assert engine.history[-1]["precision"] == "character_rate_estimate"
 

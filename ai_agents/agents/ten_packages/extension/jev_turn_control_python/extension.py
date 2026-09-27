@@ -99,16 +99,19 @@ class JevTurnControlExtension(AsyncExtension):
                 self.compress_work(request),
                 self.engine.config["compression"]["timeout_ms"] / 1000,
             )
-        except (
-            aiohttp.ClientError,
-            asyncio.TimeoutError,
-            ValueError,
-            KeyError,
-            TypeError,
-        ):
+        except asyncio.CancelledError:
+            self.engine.complete_compression(request, error="cancelled")
+            raise
+        except Exception:
+            # Provider payloads/errors are untrusted; never log their contents.
             self.engine.complete_compression(
                 request, error="provider_or_timeout"
             )
+        finally:
+            if self.engine.compression_request == request:
+                self.engine.complete_compression(
+                    request, error="incomplete_job"
+                )
         await self.pump()
 
     async def compress_work(self, request):
@@ -190,7 +193,13 @@ class JevTurnControlExtension(AsyncExtension):
                             break
                         await self.mock_audio(rid)
                         await asyncio.sleep(0.04)
-                self.engine.audio(rid, completed=True)
+                self.engine.audio(
+                    rid,
+                    completed=True,
+                    expected_ms=self.engine.responses.get(rid, {}).get(
+                        "audio_ms"
+                    ),
+                )
                 self.engine.emit(
                     "response.audio_completed", {"synthetic": True}, rid
                 )
@@ -432,9 +441,24 @@ class JevTurnControlExtension(AsyncExtension):
         elif name == "tts_audio_end":
             rid = payload.get("request_id")
             if rid == self.engine.active:
-                self.engine.audio(rid, completed=True)
+                # TTSAudioEndReason.REQUEST_END=1; INTERRUPTED=2; ERROR=3.
+                normal = payload.get("reason") == 1
+                self.engine.audio(
+                    rid,
+                    completed=True,
+                    expected_ms=payload.get("request_total_audio_duration_ms"),
+                    normal=normal,
+                )
                 self.engine.emit(
-                    "response.audio_completed", {"synthetic": False}, rid
+                    "response.audio_completed",
+                    {
+                        "synthetic": False,
+                        "normal_end": normal,
+                        "expected_audio_ms": payload.get(
+                            "request_total_audio_duration_ms"
+                        ),
+                    },
+                    rid,
                 )
         elif name == "tts_text_result":
             rid = payload.get("request_id")

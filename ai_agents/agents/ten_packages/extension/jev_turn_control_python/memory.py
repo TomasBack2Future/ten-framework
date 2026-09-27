@@ -102,8 +102,29 @@ async def summarize(request, config):
             if response.status != 200:
                 raise ValueError("summary provider unavailable")
             result = await response.json()
-    choice = result["choices"][0]
-    text = choice["message"]["content"]
-    if choice["finish_reason"] != "stop" or not isinstance(text, str):
+    return parse_summary(result)
+
+
+def parse_summary(result):
+    """Reject malformed/truncated provider responses before mutating memory."""
+    if not isinstance(result, dict):
+        raise ValueError("invalid summary response")
+    choices = result.get("choices")
+    if (
+        not isinstance(choices, list)
+        or not choices
+        or not isinstance(choices[0], dict)
+    ):
+        raise ValueError("invalid summary choices")
+    choice = choices[0]
+    message = choice.get("message")
+    if not isinstance(message, dict):
+        raise ValueError("invalid summary message")
+    text = message.get("content")
+    if (
+        choice.get("finish_reason") != "stop"
+        or not isinstance(text, str)
+        or not text.strip()
+    ):
         raise ValueError("incomplete summary")
     return text

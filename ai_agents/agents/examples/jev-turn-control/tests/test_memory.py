@@ -17,7 +17,9 @@ def exchange(engine, user, reply="Acknowledged.", interrupted=False):
     action = engine.drain_actions()[-1]
     rid = engine.active
     engine.output(rid, reply, engine.now, final=True)
-    engine.audio(rid, 1000, completed=True, timestamp=1700000000000)
+    engine.audio(
+        rid, 1000, completed=True, expected_ms=1000, timestamp=1700000000000
+    )
     engine.playback(
         rid,
         1000,
@@ -114,7 +116,7 @@ def test_backchannel_and_duplicate_final_do_not_pollute_history():
     before = deepcopy(engine.history)
     engine.start("backchannel")
     engine.output(engine.active, "Mm-hmm.", 70, final=True)
-    engine.audio(engine.active, 400, completed=True)
+    engine.audio(engine.active, 400, completed=True, expected_ms=400)
     engine.playback(engine.active, 400, 500, completed=True)
     assert engine.history == before
     engine.input("My name is Maya", True, 600, "s2")
@@ -205,7 +207,7 @@ def test_interrupted_assistant_is_never_summarized_and_capacity_does_not_evict()
         engine.start("answer")
         if engine.active:
             engine.output(engine.active, "y" * 1000, 1, final=True)
-            engine.audio(engine.active, 1000, completed=True)
+            engine.audio(engine.active, 1000, completed=True, expected_ms=1000)
             engine.playback(engine.active, 1000, 2, completed=True)
     assert "Maya" in engine.history[0]["text"]
     assert engine.context_size() <= engine.config["compression"]["max_chars"]
@@ -353,3 +355,124 @@ def test_generation_retries_once_then_speaks_safe_failure_and_shutdown_aborts():
         adapter.abort.assert_awaited_once_with(action["response_id"])
 
     asyncio.run(run())
+
+
+def test_tts_end_integrity_requires_normal_reason_and_matching_duration():
+    extension = importlib.import_module(f"{PACKAGE}.extension")
+    for reason, expected, audio_ms, full in (
+        (1, 1000, 1000, True),
+        (1, None, 1000, False),
+        (1, 2000, 1000, False),
+        (1, 0, 0, False),
+        (2, 1000, 1000, False),
+        (3, 1000, 1000, False),
+    ):
+        adapter = extension.JevTurnControlExtension("test_end_integrity")
+        engine = adapter.engine = TurnEngine()
+        engine.text = "hello"
+        engine.start("answer")
+        rid = engine.active
+        engine.output(rid, "Heard words. Unheard tail.", 0, final=True)
+        engine.audio(rid, audio_ms, timestamp=1700000000000)
+        if not full and audio_ms:
+            engine.align(
+                rid,
+                [
+                    {"text": "Heard words. ", "end_ms": 500},
+                    {"text": "Unheard tail.", "end_ms": 1500},
+                ],
+            )
+        payload = {
+            "request_id": rid,
+            "reason": reason,
+            "request_total_audio_duration_ms": expected,
+        }
+        adapter.handle_data("tts_audio_end", payload)
+        adapter.handle_data(
+            "tts_audio_end", payload
+        )  # Duplicate is idempotent.
+        if reason in (2, 3):
+            # An inconsistent late normal end must not upgrade a failed stream.
+            adapter.handle_data("tts_audio_end", {**payload, "reason": 1})
+        engine.playback(rid, audio_ms, 1000, completed=True)
+        assert engine.history[-1]["fully_played"] is full
+        if not full:
+            assert "Unheard" not in engine.history[-1]["text"]
+        before = deepcopy(engine.history)
+        adapter.handle_data(
+            "tts_audio_end",
+            {**payload, "reason": 1, "request_total_audio_duration_ms": 1000},
+        )
+        assert engine.history == before and engine.active is None
+
+
+def test_failed_tts_without_alignment_does_not_guess_full_reply():
+    engine = TurnEngine()
+    engine.text = "question"
+    engine.start("answer")
+    rid = engine.active
+    engine.output(rid, "Short but never fully synthesized", 0, final=True)
+    engine.audio(rid, 10000, completed=True, expected_ms=10000, normal=False)
+    engine.playback(rid, 10000, 10001, completed=True)
+    assert engine.history[-1]["text"] == ""
+    assert not engine.history[-1]["fully_played"]
+
+
+def test_summary_payload_validation_and_job_cleanup(monkeypatch):
+    import asyncio
+    import pytest
+
+    extension = importlib.import_module(f"{PACKAGE}.extension")
+    malformed = [
+        None,
+        {},
+        {"choices": []},
+        {"choices": [{}]},
+        {"choices": [{"message": {}, "finish_reason": "stop"}]},
+        {
+            "choices": [
+                {"message": {"content": "cut"}, "finish_reason": "length"}
+            ]
+        },
+    ]
+    for response in malformed:
+        with pytest.raises(ValueError):
+            memory.parse_summary(response)
+
+    async def run(mode):
+        adapter = extension.JevTurnControlExtension("test_summary_failure")
+        engine = adapter.engine = compression_engine()
+        engine.config.values["provider"]["name"] = "jev"
+        engine.config.values["compression"]["timeout_ms"] = 1000
+        original = deepcopy(engine.history)
+        request = engine.begin_compression(engine.now)
+        adapter.provider = types.SimpleNamespace(
+            decide=AsyncMock(
+                return_value={"compression": {"label": "compress", "score": 1}}
+            )
+        )
+        adapter.pump = AsyncMock()
+
+        async def broken_summary(*_args):
+            if mode in ("timeout", "cancel"):
+                await asyncio.sleep(2)
+            if mode == "unexpected":
+                raise IndexError("untrusted provider shape")
+            return memory.parse_summary({"choices": []})
+
+        monkeypatch.setattr(extension, "summarize", broken_summary)
+        task = asyncio.create_task(adapter.compress(request))
+        if mode == "cancel":
+            await asyncio.sleep(0.01)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            await task
+        assert engine.compression_request is None
+        assert engine.history == original and engine.summary == ""
+        assert engine.begin_compression(engine.now) is None  # Bounded cooldown.
+        assert engine.begin_compression(engine.now + 30001) is not None
+
+    for mode in ("malformed", "unexpected", "timeout", "cancel"):
+        asyncio.run(run(mode))

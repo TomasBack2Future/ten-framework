@@ -141,3 +141,18 @@ Events: `context.decision` (started/completed), `context.summary` (started),
 `context.applied`, `context.stale`, `context.failed`, `context.capacity` and
 `context.request`. Summarization is lossy and remains opt-in; provider-level fixed
 cases are not a guarantee for arbitrary conversations.
+
+Full-playback integrity additionally requires `tts_audio_end.reason=REQUEST_END`
+(`1`) and a finite positive provider `request_total_audio_duration_ms`. Its unit is
+milliseconds; it must match forwarded PCM sample duration within **2 ms** (integer
+rounding only). Missing/mismatched duration, `INTERRUPTED` (`2`) or `ERROR` (`3`)
+never authorizes full text. Duplicate consistent ends are idempotent; an abnormal
+end cannot be upgraded by a later normal end. Without word alignment an unverified
+completion stores no guessed text. Browser drain cursor tolerance remains 30 ms
+and is explicitly an estimate; it is not acoustic proof.
+
+Summary payloads must contain a nonempty `choices` array, a message with nonempty
+string content, and `finish_reason=stop`. Every job releases its reservation even
+on unexpected provider exceptions, timeout or cancellation. Cancellation is
+re-raised (not swallowed), failures keep original memory, and cooldown limits
+subsequent attempts.
