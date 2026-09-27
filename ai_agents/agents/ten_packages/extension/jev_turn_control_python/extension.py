@@ -20,6 +20,7 @@ from ten_runtime import (
     StatusCode,
 )
 
+from .executor_client import ExecutorClient
 from .config import Config
 from .engine import TurnEngine
 from .provider import DecisionProvider
@@ -40,6 +41,8 @@ class JevTurnControlExtension(AsyncExtension):
         self.asr_segment = 0
         self.asr_final_end = -1
         self.audio_response = None
+        self.executor = None
+        self.executor_notified = 0
 
     def now(self):
         return int((time.monotonic() - self.started) * 1000)
@@ -61,9 +64,13 @@ class JevTurnControlExtension(AsyncExtension):
             os.environ.get("JEV_SESSION_ID", "demo"),
         )
         self.provider = DecisionProvider(self.engine.config)
+        self.executor = ExecutorClient(
+            self.engine.emit, self.engine.config["executor"]["enabled"]
+        )
         self.engine.snapshot()
 
     async def on_start(self, ten_env: AsyncTenEnv):
+        self.executor.start()
         self.spawn(self.run_clock())
         ten_env.log_info("JEV_EXTENSION_READY stage=decision_mvp")
 
@@ -76,8 +83,29 @@ class JevTurnControlExtension(AsyncExtension):
             compression = self.engine.begin_compression(self.now())
             if compression:
                 self.spawn(self.compress(compression))
+            self.notify_executor()
             await self.pump()
             await asyncio.sleep(0.02)
+
+    def notify_executor(self):
+        state = self.executor.state
+        if (
+            state.get("status") == "completed"
+            and state.get("notify_user")
+            and state.get("current")
+            and state.get("version", 0) > self.executor_notified
+            and state.get("input_revision") == self.engine.revision
+            and not (
+                self.engine.active
+                or self.engine.stopping
+                or self.engine.pending
+                or self.engine.paused
+                or self.engine.closed
+            )
+            and self.now() - self.engine.last_input >= 1000
+        ):
+            self.executor_notified = state["version"]
+            self.engine.start("executor_result")
 
     async def classify(self, request):
         try:
@@ -257,7 +285,11 @@ class JevTurnControlExtension(AsyncExtension):
         )
 
         rid = action["response_id"]
-        request = voice_request(action, self.engine.config)
+        request = voice_request(
+            action,
+            self.engine.config,
+            self.executor.state if self.executor else None,
+        )
         self.engine.emit(
             "context.request",
             {
@@ -399,6 +431,10 @@ class JevTurnControlExtension(AsyncExtension):
                         self.asr_final_end = end_ms
             segment = payload.get("segment_id", f"asr-{self.asr_segment}")
             self.engine.input(text, final, now, segment)
+            if final and self.executor and not self.engine.closed:
+                self.executor.submit(
+                    self.engine.revision, text, self.engine.history
+                )
             if name == "asr_result" and final:
                 self.asr_segment += 1
         elif name == "jev_playback":
@@ -507,6 +543,8 @@ class JevTurnControlExtension(AsyncExtension):
         for task in list(self.tasks):
             task.cancel()
         await asyncio.gather(*list(self.tasks), return_exceptions=True)
+        if self.executor:
+            await self.executor.close()
         if self.provider:
             await self.provider.close()
         ten_env.log_info("JEV_EXTENSION_STOPPED")

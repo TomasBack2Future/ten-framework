@@ -178,3 +178,11 @@ string content, and `finish_reason=stop`. Every job releases its reservation eve
 on unexpected provider exceptions, timeout or cancellation. Cancellation is
 re-raised (not swallowed), failures keep original memory, and cooldown limits
 subsequent attempts.
+
+## Optional P1 execution
+
+`executor.enabled` defaults to false and applies only at call start. The session
+checkbox also requires operator `JEV_CODEX_ENABLED=true`; it cannot enable an
+unconfigured deployment. See `../executor/CALL_SESSIONS.md` for the separate
+service, credential injection and one-call/one-thread lifecycle. The normal
+voice image has no SDK dependency and remains usable on executor failure.

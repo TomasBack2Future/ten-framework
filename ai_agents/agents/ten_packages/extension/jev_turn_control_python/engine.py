@@ -62,6 +62,7 @@ class TurnEngine:
                 "input_text",
                 "context",
                 "phrase",
+                "summary",
             ):
                 if key in data:
                     data[key] = "[redacted]"
@@ -493,7 +494,7 @@ class TurnEngine:
             "audio_ms": 0,
             "fully_played": False,
         }
-        if mode != "backchannel":
+        if mode not in ("backchannel", "executor_result"):
             self.pending = False
             self.consumed_segment = self.segment
             self.consumed_text = self.text[len(self.committed) :].strip()
@@ -504,8 +505,12 @@ class TurnEngine:
             "response.started",
             {
                 "mode": mode,
-                "reason": "timer_or_decision",
-                "input_text": self.text,
+                "reason": (
+                    "background_result"
+                    if mode == "executor_result"
+                    else "timer_or_decision"
+                ),
+                "input_text": "" if mode == "executor_result" else self.text,
             },
             rid,
         )
@@ -515,7 +520,7 @@ class TurnEngine:
             input_revision=self.revision,
             response_id=rid,
             mode=mode,
-            input_text=self.text,
+            input_text="" if mode == "executor_result" else self.text,
             context=deepcopy(self.history),
             summary=self.summary,
             context_revision=self.context_revision,
@@ -526,7 +531,7 @@ class TurnEngine:
             ),
         )
 
-        if mode != "backchannel":
+        if mode not in ("backchannel", "executor_result"):
             self.history.append({"role": "user", "text": self.text})
             self.context_revision += 1
 
