@@ -140,10 +140,10 @@ class TurnEngine:
             self.emit("timer.cancelled", {**self.timer, "reason": reason})
             self.timer = None
 
-    def schedule(self, label):
+    def schedule(self, label, immediate=False):
         self.cancel_timer("replaced")
         self.timer_seq += 1
-        delay = self.config["wait"][label + "_ms"]
+        delay = 0 if immediate else self.config["wait"][label + "_ms"]
         self.timer = {
             "timer_id": self.timer_seq,
             "label": label,
@@ -313,6 +313,18 @@ class TurnEngine:
         self.now = now
         if self.closed or self.paused:
             return
+        if (
+            self.active
+            and self.responses[self.active]["mode"] == "backchannel"
+            and self.pending
+            and self.config["start"]["enabled"]
+            and self.timer
+            and now >= self.timer["due_ms"]
+            and self.timer["label"] != "ignore"
+        ):
+            label = self.timer["label"]
+            self.stop("main_response_priority")
+            self.schedule(label, immediate=True)
         if self.stopping:
             response = self.responses[self.stopping]
             if now >= response["stop_deadline"]:
