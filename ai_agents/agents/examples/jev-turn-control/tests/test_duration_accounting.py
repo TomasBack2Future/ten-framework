@@ -25,7 +25,7 @@ Config = sys.modules[f"{PACKAGE}.config"].Config
 TurnEngine = sys.modules[f"{PACKAGE}.engine"].TurnEngine
 
 # b09b9e8 live diagnostic: 50 mono PCM16 chunks, 16 kHz, 291272 bytes.
-FRAMES = [
+FRAMES = (
     4036,
     6400,
     2692,
@@ -76,7 +76,7 @@ FRAMES = [
     5044,
     6400,
     4518,
-]
+)
 REPORTED_MS = 9094
 
 
@@ -131,7 +131,7 @@ class DurationAccountingTests(unittest.TestCase):
         )
 
     def test_false_flag_excludes_assistant_from_summary_source(self):
-        engine, heard = self.response()
+        engine, _ = self.response()
         engine.history[1]["fully_played"] = False
         engine.history[0]["text"] = "a" * 1100
         engine.history.append({"role": "user", "text": "Recent turn"})
