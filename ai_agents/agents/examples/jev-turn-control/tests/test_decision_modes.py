@@ -132,7 +132,7 @@ def test_defaults_baseline_overrides_and_label_validation():
     config = Config.load()
     assert config["provider"]["name"] == "jev"
     assert config["start"]["threshold"] == 0.47
-    assert config["start"]["score_mode"] == "top"
+    assert config["start"]["score_mode"] == "answer_plus_clarify"
     assert not config["compression"]["enabled"]
     assert not config["backchannel"]["enabled"]
     assert (
@@ -260,7 +260,7 @@ def test_selected_start_gate_and_subcategory(mode, threshold):
     no = apply("clarify", {"clarify": threshold - 0.01, "answer": 0})
     assert not no.timer
     split = apply("clarify", {"clarify": threshold - 0.1, "answer": 0.15})
-    assert bool(split.timer) == (mode != "jev")
+    assert split.timer is not None
     continuation = apply(
         "continuation", {"continuation": 0.35, "answer": 0.32, "clarify": 0.33}
     )

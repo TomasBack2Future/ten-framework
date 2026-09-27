@@ -27,6 +27,7 @@ class TurnEngine:
         self.pending = False
         self.input_cycle = 0
         self.first_input = 0
+        self.stop_pending_since = None
         self.last_input = 0
         self.last_request = -100000
         self.inflight = None
@@ -136,13 +137,27 @@ class TurnEngine:
         }
         return self.emit("state.snapshot", state, self.active)
 
+    @staticmethod
+    def same_transcript(left, right):
+        """Ignore terminal punctuation/case revisions, never added words."""
+
+        def normalized(text):
+            text = text.strip().casefold()
+            while text and text[-1] in ".?!。？！…":
+                text = text[:-1].rstrip()
+            return text
+
+        return normalized(left) == normalized(right)
+
     def input(self, text, final, now, segment_id="default"):
         if self.closed or not text.strip():
             return
         self.now = now
         text = " ".join(text[:12000].split())
         # A repeated final for the partial already used to answer is not a new turn.
-        if segment_id == self.consumed_segment and text == self.consumed_text:
+        if segment_id == self.consumed_segment and self.same_transcript(
+            text, self.consumed_text
+        ):
             return
         if segment_id != self.segment:
             if self.segment:
@@ -155,6 +170,10 @@ class TurnEngine:
             self.first_input = now
             self.input_cycle += 1
             self.guidance_sent = False
+        # Preserve a bound across an unresolved partial storm, but a previous
+        # accepted continue cannot give fresh input an already expired deadline.
+        if self.active and self.stop_pending_since is None:
+            self.stop_pending_since = now
         self.pending = True
         self.text, self.final = combined, final
         self.revision += 1
@@ -174,6 +193,7 @@ class TurnEngine:
     def consume_input(self, reason, clear_text=True):
         """End one input cycle without erasing committed conversation memory."""
         self.pending = False
+        self.stop_pending_since = None
         if self.segment:
             self.consumed_segment = self.segment
             self.consumed_text = self.text[len(self.committed) :].strip()
@@ -356,6 +376,8 @@ class TurnEngine:
                 "error", {"code": "provider_unavailable", "recoverable": True}
             )
             return
+        if "stop" in request["kinds"]:
+            self.stop_pending_since = None
         stop = answers.get("stop", {})
         if (
             self.active
@@ -436,6 +458,15 @@ class TurnEngine:
             ):
                 event["payload"]["applied"] = True
                 event["payload"].update(details)
+                self.emit(
+                    "decision.applied",
+                    {
+                        "decision_seq": event["seq"],
+                        "decision_kind": kind,
+                        **details,
+                    },
+                    event.get("response_id"),
+                )
                 break
 
     def tick(self, now):
@@ -468,8 +499,9 @@ class TurnEngine:
             self.pending
             and self.active
             and self.config["stop"]["enabled"]
-            and now >= self.first_input + self.config["stop"]["max_wait_ms"]
-            and self.last_decided != self.revision
+            and self.stop_pending_since is not None
+            and now
+            >= self.stop_pending_since + self.config["stop"]["max_wait_ms"]
         ):
             self.stop("stop_maximum_wait")
             self.schedule("continuation")
@@ -543,6 +575,7 @@ class TurnEngine:
             "mode": mode,
             "precision": "unknown",
             "generation_done": False,
+            "tts_submitted": False,
             "audio_done": False,
             "audio_end_received": False,
             "audio_failed": False,

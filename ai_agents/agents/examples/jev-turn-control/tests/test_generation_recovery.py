@@ -53,7 +53,8 @@ def adapter_for(rounds, before=None):
             yield result, None
 
     adapter.ten_env = types.SimpleNamespace(send_cmd_ex=stream)
-    adapter.tts = AsyncMock()
+    adapter.send_data = AsyncMock()
+    adapter.tts = AsyncMock(wraps=adapter.tts)
     adapter.pump = AsyncMock()
     return adapter, action, calls
 
@@ -171,3 +172,56 @@ def test_buffer_control_without_response_cannot_clear_idle_pending():
         "jev_control", {"action": "stop", "reason": "buffer_limit"}
     )
     adapter.engine.stop.assert_not_called()
+
+
+def test_cumulative_stream_recovers_missing_and_out_of_order_deltas():
+    # Actual failure shape: a future cumulative prefix arrives before old deltas.
+    a = delta("Hello")
+    b = delta("Maya")
+    b.content = "Hello there, Maya"
+    late = delta(" there,")
+    late.content = "Hello there,"
+    adapter, action, _calls = adapter_for(
+        [[a, b, late, done("Hello there, Maya.")]]
+    )
+    asyncio.run(adapter.generate(action))
+    assert (
+        "".join(c.args[1] for c in adapter.tts.await_args_list)
+        == "Hello there, Maya."
+    )
+    assert (
+        adapter.engine.responses[action["response_id"]]["text"]
+        == "Hello there, Maya."
+    )
+
+
+def test_non_prefix_stream_rewrite_is_not_spoken_or_committed():
+    adapter, action, calls = adapter_for([[delta("Hello."), delta("Goodbye.")]])
+    asyncio.run(adapter.generate(action))
+    assert len(calls) == 1
+    assert "".join(c.args[1] for c in adapter.tts.await_args_list) == "Hello."
+    assert adapter.engine.active is None
+
+
+def test_unsent_rewrite_retries_without_leaking_first_attempt():
+    adapter, action, calls = adapter_for(
+        [[delta("Hello"), delta("Goodbye.")], [done("Recovered.")]]
+    )
+    asyncio.run(adapter.generate(action))
+    assert len(calls) == 2
+    assert (
+        "".join(c.args[1] for c in adapter.tts.await_args_list) == "Recovered."
+    )
+    assert (
+        adapter.engine.responses[action["response_id"]]["text"] == "Recovered."
+    )
+
+
+def test_unsent_incomplete_stream_retries_then_speaks_fallback():
+    adapter, action, calls = adapter_for([[delta("Hello")]])
+    asyncio.run(adapter.generate(action))
+    assert len(calls) == 2
+    adapter.tts.assert_awaited_once()
+    text = adapter.tts.await_args.args[1]
+    assert text.startswith("Sorry")
+    assert adapter.engine.responses[action["response_id"]]["text"] == text

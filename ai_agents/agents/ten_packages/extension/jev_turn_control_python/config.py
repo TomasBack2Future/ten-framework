@@ -160,8 +160,8 @@ class Config:
             for key, value in options.items():
                 if key.endswith("_ms") and not 0 <= value <= 60000:
                     raise ValueError(f"out of range: {section}.{key}")
-                if key.endswith("prompt") and len(value) > 2000:
-                    raise ValueError("prompt exceeds 2000 characters")
+                if key.endswith("prompt") and len(value) > 4096:
+                    raise ValueError("prompt exceeds 4096 characters")
                 if key.endswith("threshold") and not 0 <= value <= 1:
                     raise ValueError("threshold outside [0,1]")
         if self["support"]["threshold"] <= 0:

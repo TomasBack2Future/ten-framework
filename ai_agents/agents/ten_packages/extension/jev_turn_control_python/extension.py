@@ -134,8 +134,9 @@ class JevTurnControlExtension(AsyncExtension):
     async def classify(self, request):
         self.record("decision.request", request, request.get("response_id"))
         started = time.monotonic_ns()
-        try:
-            answers = await self.provider.decide(request)
+
+        def apply_result(answers):
+            self.engine.complete_decision(request, answers, self.now())
             self.record(
                 "decision.result",
                 {
@@ -144,7 +145,9 @@ class JevTurnControlExtension(AsyncExtension):
                     "duration_ns": time.monotonic_ns() - started,
                 },
             )
-            self.engine.complete_decision(request, answers, self.now())
+
+        try:
+            await self.provider.decide(request, on_result=apply_result)
         except (
             aiohttp.ClientError,
             asyncio.TimeoutError,
@@ -301,10 +304,13 @@ class JevTurnControlExtension(AsyncExtension):
                         rid,
                     )
                     if (
-                        self.engine.responses[rid]["text"].strip()
+                        self.engine.responses[rid]["tts_submitted"]
                         or self.engine.responses[rid]["audio_ms"] > 0
                     ):
                         raise
+                    # Discard only text that has never been handed to TTS.
+                    self.engine.responses[rid]["text"] = ""
+                    self.engine.output(rid, "", self.now())
                     if attempt == 0:
                         self.engine.emit(
                             "generation.retry",
@@ -372,7 +378,9 @@ class JevTurnControlExtension(AsyncExtension):
             self.record("llm.stream", json.loads(raw), rid)
             response = parse_llm_response(raw)
             if isinstance(response, LLMResponseMessageDelta):
-                text = response.delta or ""
+                text = self.stream_suffix(
+                    generated, response.content, response.delta
+                )
                 if not self.engine.output(rid, text, self.now()):
                     return
                 generated += text
@@ -387,14 +395,14 @@ class JevTurnControlExtension(AsyncExtension):
                     await self.tts(rid, fragment, False)
                     fragment = ""
             elif isinstance(response, LLMResponseMessageDone):
-                if not generated.strip():
-                    text = response.content or ""
-                    if not text.strip():
-                        raise EmptyGenerationError("empty LLM response")
+                text = self.stream_suffix(generated, response.content, "")
+                if text:
                     if not self.engine.output(rid, text, self.now()):
                         return
-                    generated = text
-                    fragment = text
+                    generated += text
+                    fragment += text
+                if not generated.strip():
+                    raise EmptyGenerationError("empty LLM response")
                 done = True
                 self.engine.output(rid, "", self.now(), final=True)
                 await self.tts(rid, fragment, True)
@@ -405,8 +413,22 @@ class JevTurnControlExtension(AsyncExtension):
             raise RuntimeError("incomplete LLM stream")
         # Agent EOS is never used as input turn completion.
 
+    @staticmethod
+    def stream_suffix(generated, content, delta):
+        """Recover skipped deltas from cumulative content; ignore late prefixes."""
+        if not content:
+            return delta or ""
+        if content.startswith(generated):
+            return content[len(generated) :]
+        if generated.startswith(content):
+            return ""
+        # A rewrite is not append-only: do not speak or memorize corrupt text.
+        raise ValueError("non-prefix LLM stream revision")
+
     async def tts(self, rid, text, final):
         if rid == self.engine.active:
+            if text.strip():
+                self.engine.responses[rid]["tts_submitted"] = True
             self.record(
                 "tts.input", {"text": text, "text_input_end": final}, rid
             )
