@@ -77,11 +77,6 @@ export class Player {
     const bytes = Uint8Array.from(atob(message.audio), (c) => c.charCodeAt(0));
     if (bytes.length % 2 || bytes.length > 192000) return false;
     const start = Math.max(this.next, this.ctx.currentTime + 0.015);
-    const duration = bytes.length / 2 / rate;
-    if (start + duration - this.ctx.currentTime > 30) {
-      this.stop(this.response, "buffer_limit");
-      return false;
-    }
     const view = new DataView(bytes.buffer);
     const buffer = this.ctx.createBuffer(1, bytes.length / 2, rate);
     const samples = buffer.getChannelData(0);

@@ -89,18 +89,18 @@ test("stop during latency drain stays partial and cannot become completed", asyn
   assert.equal(terminal[0].completed, false);
 });
 
-test("incoming audio crosses the buffer budget once, preserving cause", async (t) => {
+test("audio beyond 30 seconds stays queued until explicitly stopped", async (t) => {
   const { p, reports } = await fixture(t);
   p.ctx.outputLatency = 0;
-  for (let i = 0; i < 299; i++) assert.ok(p.play(frame("r1")));
-  assert.equal(p.play(frame("r1", 200)), false);
-  const terminal = reports.filter((x) => x.stopped);
-  assert.equal(terminal.length, 1);
-  assert.equal(terminal[0].reason, "buffer_limit");
-  assert.equal(terminal[0].completed, false);
-  assert.ok(p.ctx.nodes.every((x) => x.stopped));
+  for (let i = 0; i < 400; i++) assert.ok(p.play(frame("r1")));
+  assert.ok(p.next - p.ctx.currentTime > 40);
+  assert.equal(p.response, "r1");
+  assert.equal(reports.filter((x) => x.stopped || x.completed).length, 0);
+  assert.ok(p.ctx.nodes.every((x) => !x.stopped));
   p.stop("r1");
+  assert.ok(p.ctx.nodes.every((x) => x.stopped));
   assert.equal(reports.filter((x) => x.stopped).length, 1);
+  assert.equal(p.play(frame("r1")), false);
   p.begin("r2");
   assert.ok(p.play(frame("r2")));
   assert.equal(p.play(frame("r1")), false);
