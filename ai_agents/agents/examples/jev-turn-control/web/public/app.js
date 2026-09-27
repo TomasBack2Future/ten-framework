@@ -1,0 +1,302 @@
+import { EventStore } from "./state.js";
+import { Player, Recorder } from "./audio.js";
+const $ = (id) => document.getElementById(id);
+const store = new EventStore();
+let socket,
+  config,
+  session,
+  recording = false,
+  reconnectTimer,
+  closing = false;
+const send = (data) => {
+  if (socket?.readyState === WebSocket.OPEN && socket.bufferedAmount < 65536)
+    socket.send(JSON.stringify(data));
+};
+const control = (data) => send({ type: "data", name: "jev_control", data });
+const player = new Player((data) => {
+  send({ type: "data", name: "jev_playback", data });
+});
+const recorder = new Recorder();
+const fail = (error) => {
+  $("error").textContent = error.message || String(error);
+};
+async function api(path, body) {
+  const result = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await result.json();
+  if (!result.ok) {
+    if (result.status === 401) $("login").hidden = false;
+    throw new Error(data.error || "Request failed");
+  }
+  return data;
+}
+function status(text) {
+  $("status").textContent = text;
+}
+function detail(e) {
+  const p = e.payload || {};
+  return [
+    p.decision_kind,
+    p.provider,
+    p.label,
+    p.score !== undefined ? `score ${Number(p.score).toFixed(3)}` : "",
+    p.duration_ms !== undefined ? `${p.duration_ms} ms` : "",
+    p.applied !== undefined ? `applied ${p.applied}` : "",
+    p.discard_reason,
+    p.reason,
+    p.timer_kind,
+    p.delay_ms !== undefined ? `delay ${p.delay_ms} ms` : "",
+    p.accuracy,
+    p.probabilities ? JSON.stringify(p.probabilities) : "",
+    p.due_ms !== undefined ? `due ${p.due_ms} ms` : "",
+    $("show-text").checked
+      ? p.input_summary || p.input_text || p.text || ""
+      : "",
+  ]
+    .filter((x) => x !== undefined && x !== "")
+    .join(" · ");
+}
+function renderEvent(e) {
+  const row = document.createElement("tr");
+  for (const value of [
+    `${(e.relative_time_ms / 1000).toFixed(2)}s`,
+    e.type,
+    `r${e.input_revision}${e.response_id ? " / " + e.response_id : ""}`,
+    detail(e),
+  ]) {
+    const td = document.createElement("td");
+    td.textContent = value;
+    row.append(td);
+  }
+  $("events").prepend(row);
+  while ($("events").children.length > 300) $("events").lastChild.remove();
+}
+function apply(e) {
+  if (!store.apply(e)) return;
+  renderEvent(e);
+  $("revision").textContent = `Input revision ${e.input_revision}`;
+  const p = e.payload || {};
+  if (e.type === "state.snapshot") {
+    // Restore labels only: NEVER replay response.started or audio from a snapshot.
+    player.stop();
+    status(p.mode ? `${p.mode} · connected` : "Connected · restored");
+    if (p.input_text || p.transcript || p.text)
+      $("transcript").textContent = p.input_text || p.transcript || p.text;
+    if (p.context)
+      $("heard").textContent = p.context
+        .map((x) => `${x.text || ""} (${x.precision || "estimated"})`)
+        .join(" / ");
+    if (p.heard_context)
+      $("heard").textContent =
+        typeof p.heard_context === "string"
+          ? p.heard_context
+          : JSON.stringify(p.heard_context);
+    return;
+  }
+  if (e.type === "asr.updated") {
+    $("transcript").textContent = p.text || "";
+    $("subtitle").textContent = p.text || "Listening…";
+  }
+  if (e.type.startsWith("decision.")) {
+    const kind = p.decision_kind;
+    if (["stop", "start", "backchannel"].includes(kind)) {
+      $("brain-" + kind).textContent =
+        e.type === "decision.started"
+          ? "Evaluating…"
+          : p.label || e.type.split(".")[1];
+      $("detail-" + kind).textContent = detail(e);
+    }
+  }
+  if (e.type === "response.started") {
+    player.begin(e.response_id);
+    status("Responding");
+  }
+  if (e.type === "response.audio_completed")
+    player.audioComplete(e.response_id);
+  if (e.type === "response.cancelled") {
+    player.stop(e.response_id);
+    status("Listening · output cancelled");
+  }
+  if (e.type.startsWith("playback.") && p.heard_text !== undefined)
+    $("heard").textContent =
+      `${p.heard_text || "(none)"} · ${p.played_ms} ms · ${p.precision || "estimated"} · ${p.confirmed ? "confirmed cursor" : "unconfirmed"}`;
+  if (e.type === "error") fail(p.message || p.reason || "Agent error");
+}
+function openSocket() {
+  socket = new WebSocket(
+    `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws`,
+  );
+  socket.onopen = () => {
+    status(`${config.mode} · connected`);
+    control({ action: "snapshot" });
+    $("orb").classList.add("active");
+    for (const id of ["stop", "end", "replay", "send-text"])
+      $(id).disabled = false;
+    $("mic").disabled = config.mode !== "live";
+  };
+  socket.onmessage = ({ data }) => {
+    try {
+      const m = JSON.parse(data);
+      if (m.type === "data" && m.name === "jev_event") apply(m.data);
+      else if (m.type === "audio") player.play(m);
+      else if (m.type === "error") fail(m.error);
+      else if (
+        m.type === "data" &&
+        m.name === "text_data" &&
+        m.data.data_type !== "reasoning"
+      )
+        $("subtitle").textContent = m.data.text || "";
+    } catch {
+      fail("Invalid event received");
+    }
+  };
+  socket.onclose = () => {
+    player.stop();
+    recorder.stop();
+    recording = false;
+    $("mic").textContent = "Microphone off";
+    $("orb").classList.remove("active");
+    if (!closing) {
+      status("Reconnecting…");
+      reconnectTimer = setTimeout(openSocket, 1500);
+    }
+  };
+  socket.onerror = () => status("Connection interrupted");
+}
+$("connect").onclick = async () => {
+  try {
+    await player.unlock();
+    session = await api("/api/session", {
+      settings: {
+        "start.enabled": $("enable-start").checked,
+        "stop.enabled": $("enable-stop").checked,
+        "backchannel.enabled": $("enable-backchannel").checked,
+        "start.prompt": $("prompt").value,
+      },
+    });
+    for (const id of [
+      "enable-start",
+      "enable-stop",
+      "enable-backchannel",
+      "prompt",
+      "apply",
+    ])
+      $(id).disabled = true;
+    store.reset();
+    $("events").replaceChildren();
+    $("connect").disabled = true;
+    closing = false;
+    openSocket();
+  } catch (e) {
+    fail(e);
+  }
+};
+$("end").onclick = async () => {
+  closing = true;
+  clearTimeout(reconnectTimer);
+  await recorder.stop();
+  recording = false;
+  player.stop();
+  socket?.close();
+  await api("/api/end", {}).catch(fail);
+  session = null;
+  for (const id of [
+    "enable-start",
+    "enable-stop",
+    "enable-backchannel",
+    "prompt",
+    "apply",
+  ])
+    $(id).disabled = false;
+  $("connect").disabled = false;
+  for (const id of ["mic", "stop", "end", "replay", "send-text"])
+    $(id).disabled = true;
+  status("Session ended");
+};
+$("mic").onclick = async () => {
+  try {
+    if (recording) {
+      await recorder.stop();
+      recording = false;
+    } else {
+      await recorder.start(send);
+      recording = true;
+    }
+    $("mic").textContent = recording ? "Mute microphone" : "Microphone off";
+  } catch (e) {
+    fail(e);
+  }
+};
+$("stop").onclick = () => {
+  player.stop();
+  control({ action: "stop" });
+  status("Playback stopped");
+};
+$("replay").onclick = () => control({ action: "replay" });
+$("text-form").onsubmit = (e) => {
+  e.preventDefault();
+  send({
+    type: "data",
+    name: "jev_asr",
+    data: {
+      text: $("text").value,
+      final: true,
+      segment_id: crypto.randomUUID(),
+    },
+  });
+  $("text").value = "";
+};
+$("apply").onclick = () => {
+  status("Settings ready for the next session");
+};
+$("login").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    await api("/api/login", { code: $("access").value });
+    $("access").value = "";
+    $("login").hidden = true;
+    $("error").textContent = "";
+  } catch (err) {
+    fail(err);
+  }
+};
+$("clear").onclick = () => $("events").replaceChildren();
+$("show-text").onchange = () => {
+  $("events").replaceChildren();
+  for (const e of store.events) renderEvent(e);
+};
+setInterval(() => {
+  if (session) {
+    const n = Math.max(0, Math.ceil((session.expires_at - Date.now()) / 1000));
+    $("clock").textContent =
+      `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")} remaining`;
+    if (!n) $("end").click();
+  }
+}, 1000);
+fetch("/api/config")
+  .then((r) => r.json())
+  .then((c) => {
+    config = c;
+    $("mode").textContent =
+      c.mode === "live" ? "LIVE · TEN GRAPH" : "MOCK · SCRIPTED";
+    $("version").textContent = c.revision.slice(0, 12);
+    $("mock-tools").hidden = c.mode === "live";
+    $("notice").textContent =
+      c.mode === "live"
+        ? "A private, time-limited voice session. Microphone starts only when you choose."
+        : "Mock mode: scripted transcripts and decisions. Microphone disabled; no live ASR, LLM or TTS.";
+  })
+  .catch(fail);
+window.addEventListener("pagehide", () => {
+  closing = true;
+  socket?.close();
+  recorder.stop();
+  player.destroy();
+  navigator.sendBeacon(
+    "/api/end",
+    new Blob(["{}"], { type: "application/json" }),
+  );
+});

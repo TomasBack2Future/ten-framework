@@ -1,0 +1,53 @@
+name: Jev demo
+on:
+  push:
+    branches: [feat/jev-web-deploy, integration/jev-mvp]
+    paths: ['ai_agents/agents/examples/jev-turn-control/**', 'ai_agents/agents/ten_packages/extension/jev_turn_control_python/**', 'ai_agents/agents/ten_packages/extension/websocket_server/**', '.github/workflows/jev-demo.yml']
+  pull_request:
+    paths: ['ai_agents/agents/examples/jev-turn-control/**', 'ai_agents/agents/ten_packages/extension/jev_turn_control_python/**', 'ai_agents/agents/ten_packages/extension/websocket_server/**', '.github/workflows/jev-demo.yml']
+permissions:
+  contents: read
+concurrency:
+  group: jev-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  web:
+    if: github.repository == 'TomasBack2Future/ten-framework'
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with: {node-version: '22', cache: npm, cache-dependency-path: ai_agents/agents/examples/jev-turn-control/web/package-lock.json}
+    - run: npm ci --ignore-scripts && npm run check && npm test && npx prettier --check public/*.js public/*.css public/*.html server.mjs test/*.mjs
+      working-directory: ai_agents/agents/examples/jev-turn-control/web
+    - name: Build credential-free web preview
+      run: docker build --build-arg REVISION=${{ github.sha }} -t jev-web-test -f ai_agents/agents/examples/jev-turn-control/web/Dockerfile ai_agents/agents/examples/jev-turn-control
+    - name: Smoke preview image
+      run: |
+        docker run -d --name jev-smoke -e JEV_ALLOW_LOCAL=1 -p 127.0.0.1:3300:3000 jev-web-test
+        for i in $(seq 1 20); do curl -fsS http://127.0.0.1:3300/healthz && exit 0; sleep 1; done
+        docker logs jev-smoke
+        exit 1
+  publish:
+    needs: web
+    if: github.event_name == 'push' && github.repository == 'TomasBack2Future/ten-framework'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - uses: actions/checkout@v4
+    - uses: docker/setup-buildx-action@v3
+    - uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - uses: docker/build-push-action@v6
+      with:
+        context: ai_agents/agents/examples/jev-turn-control
+        file: ai_agents/agents/examples/jev-turn-control/web/Dockerfile
+        push: true
+        tags: ghcr.io/tomasback2future/jev-turn-control-web:${{ github.sha }}
+        build-args: REVISION=${{ github.sha }}
+# Cluster deploy is deliberately local: no kubeconfig or cluster secret in Actions.
