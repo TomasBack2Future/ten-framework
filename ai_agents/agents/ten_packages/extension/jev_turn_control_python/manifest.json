@@ -1,0 +1,45 @@
+{
+  "type": "extension",
+  "name": "jev_turn_control_python",
+  "version": "0.1.0",
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "=0.11.73"
+    }
+  ],
+  "api": {
+    "cmd_in": [
+      {
+        "name": "jev_ping",
+        "property": {
+          "properties": {
+            "nonce": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "nonce"
+          ]
+        },
+        "result": {
+          "property": {
+            "properties": {
+              "nonce": {
+                "type": "string"
+              },
+              "stage": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "nonce",
+              "stage"
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
