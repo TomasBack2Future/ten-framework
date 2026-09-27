@@ -1,0 +1,6 @@
+{
+  "sequences": 2592,
+  "exact_body_cache_lookups": 18790,
+  "network_calls": 0,
+  "all_events_and_results_identical": true
+}

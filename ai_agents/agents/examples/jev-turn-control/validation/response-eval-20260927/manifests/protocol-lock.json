@@ -1,0 +1,9 @@
+{
+  "base_sha": "78d44c91d2a7151da18a9d5e82b69b86dbbc1536",
+  "prompt_authorship": "B authored from seen issues before new data/provider results; no new holdout inspection used",
+  "hashes": {
+    "PROTOCOL.md": "09854f6a95d916d1b0316da17b501352c52314d22f7efb3f355d0471efd9226f",
+    "prompt-A.json": "a78fb5c69013a74fcf9302faa69516b454f756a5985673817f60ddb9bfe5b53c",
+    "prompt-B.json": "87ff7e7691b5d239062ea25bc7a691a2011857b8f5504f12d5db219443b8f581"
+  }
+}

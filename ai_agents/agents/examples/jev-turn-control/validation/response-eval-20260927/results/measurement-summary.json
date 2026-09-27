@@ -1,0 +1,570 @@
+{
+  "network": {
+    "jev": {
+      "http_calls": 2688,
+      "http_or_validation_errors": 0,
+      "over_800ms": 0,
+      "p50_ms": 92.699,
+      "p95_ms": 140.937,
+      "returned_models": [
+        "jev-1.13.0"
+      ]
+    },
+    "scaledown": {
+      "http_calls": 2688,
+      "http_or_validation_errors": 0,
+      "over_800ms": 0,
+      "p50_ms": 302.327,
+      "p95_ms": 401.977,
+      "returned_models": [
+        "classify-1"
+      ]
+    }
+  },
+  "repeatability": {
+    "jev": {
+      "request_groups": 28,
+      "calls_per_group": 4,
+      "groups_with_label_change": 2,
+      "groups_with_gate_change_at_047": 1,
+      "details": [
+        {
+          "request_hash": "52f04a62e2334fd1faa13676ea469649dedf1301c1da6124d9931efed8c93516",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "clarify"
+          ]
+        },
+        {
+          "request_hash": "4b829f0a603291ef2875e48a696989d337d89f38bbf9b97f706c6bae869392b9",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "ignore"
+          ]
+        },
+        {
+          "request_hash": "b6f6863834e1e72940513114f806fd0352395cbd5ab4dffe7a221e9c0a6e9b6b",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "continuation"
+          ]
+        },
+        {
+          "request_hash": "285e6e1b5ebb76d829abc24a05e250e9fa97410ecc6e3f9463b3c7dcfd5df6af",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "6c270f7a613cdffd87e5fc6a87e172b2f330ebbd636df3738d6b57b678e73445",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "clarify"
+          ]
+        },
+        {
+          "request_hash": "b0050600813eb33edcfd8882b2b66cad906fba6b98195f53471f1dd14b9cb79a",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "clarify"
+          ]
+        },
+        {
+          "request_hash": "2866f81b4a28d1eb37ea1b21b9b4f9cef6f353ab35ba02067b982211cca15e9e",
+          "n": 4,
+          "label_changed": true,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer",
+            "clarify"
+          ]
+        },
+        {
+          "request_hash": "2df33c7e176dd93551625cac51273aff2e5d08f7ff49ac277d45f19ecdc0ab7a",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "explicit_wait"
+          ]
+        },
+        {
+          "request_hash": "27859b0f76fc1b50700de39c41a869e2e5a04c40777a265bced8e78bf115e474",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "cb7f2d509d769719fd0cf20d290675728f7f58ee95b950c7debd20b12671ea76",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "continuation"
+          ]
+        },
+        {
+          "request_hash": "b8cb65bbec7883ff532dd2ddad0d2ba627e30bfb4bbcb9a89ecb79e241817b7e",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": true,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "ff72db2d8164d8675cb2c9103854a97468e857645ba8a179b1ae79d24c3b3608",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "continuation"
+          ]
+        },
+        {
+          "request_hash": "a94efc003836908b1e0c0cc95701f1ecf6df0d6372bd57a2218dd272ef2603e1",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "continuation"
+          ]
+        },
+        {
+          "request_hash": "0efde2a1ae87f9e0796cea6e957c1e5e8be0129c7dea1723e48752155f9056f4",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "continuation"
+          ]
+        },
+        {
+          "request_hash": "6ee2284b05a8c869c3a2536fd35112eace441069e9ea62018789a90a45eddb4d",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "ignore"
+          ]
+        },
+        {
+          "request_hash": "41da3a755555798be5713ba261fc347846030c5d1485b1b50735c5a3cf882e6c",
+          "n": 4,
+          "label_changed": true,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer",
+            "ignore"
+          ]
+        },
+        {
+          "request_hash": "6634ffc5f4dbe866d2ba783c9d446e3acfe41dc0577c3528e1e5d0714af87051",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "ignore"
+          ]
+        },
+        {
+          "request_hash": "dcc4050eeb1f9936991f718f9eeed43476a7fbccbafa296d8e752110523d537a",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "ignore"
+          ]
+        },
+        {
+          "request_hash": "2ebe0215200cf7a3ac30ad0431c84d08f251a376549114eb9591fe297691ee92",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "ignore"
+          ]
+        },
+        {
+          "request_hash": "bfafc67c22f2c6181d09759ab0848e58fa48fb992d9dee2d92313ca3d6b76fb9",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "clarify"
+          ]
+        },
+        {
+          "request_hash": "01a27efb7f270417d24bc5162479b07a2f2d85a5ace9427f61da337cf4ad475c",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "ignore"
+          ]
+        },
+        {
+          "request_hash": "a74ff18f009efb000ac011d36fd6b3144b0ee62d6008302ddc5d59f82ff6cd60",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "clarify"
+          ]
+        },
+        {
+          "request_hash": "c72ff0fe6956bfa6b3778a645c227c86d8353bb9fdfaeb80b228d9da8067aef9",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "ignore"
+          ]
+        },
+        {
+          "request_hash": "8389b9a11a9abbe67ea63c64d535459c046652c7aa8315c607b92bef4e17c29e",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "continuation"
+          ]
+        },
+        {
+          "request_hash": "dd55a7e4161f804653c351d3eac32804d326667ffd57da162e497b03739ee3b1",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "ignore"
+          ]
+        },
+        {
+          "request_hash": "c58c4536819e393c5c03c6a6c3a5346e3c49caf651642e331ce29565bbfa64f8",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "b3222e12abe3d9ec8a3354aa990e515f2afa8fe1d0a96c89bb15701f80c3be71",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "ignore"
+          ]
+        },
+        {
+          "request_hash": "ad8a4a083be6c223768b79e110d6830095ccd92d72ec469cb5ca9ff906140e8e",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "ignore"
+          ]
+        }
+      ]
+    },
+    "scaledown": {
+      "request_groups": 28,
+      "calls_per_group": 4,
+      "groups_with_label_change": 4,
+      "groups_with_gate_change_at_047": 3,
+      "details": [
+        {
+          "request_hash": "1718b44224187dcd08e830c0ab2a932e38c7a59c643061071c68e126ea613a32",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "9e30abecc82d48487338178d3d9b4b49b62c50d46fc02bbb7f7f29679fd18981",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "23c1fa98dc5ba0777b9084e9ddb79131b44d0233511e62ea695c86cf9ec17f6e",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "506aa3d9b1b6d8f4435b86c9fb436ccf1a8cfc5f378323eb5c807f3da1275349",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "08325e4a5e17f8f91700d18223cf3e07faf1089109ab936f4a9ef26e3fff7bca",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "95c6c7a1bf800c1ac777b429f4e9d5fd6ff45f2d3bc1e9ba4e39b93e44aa93fa",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "dc18317584cfbe52152352e66799f167441dffe2121c77ae833678f49557f49c",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "b81790b6a77e20b9b96c03404dd69b94b674cf66c0adc9f383c0aa9642729ec0",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "92e003aae9e7160328ab8259543f7e3e723bf3e31d0c5cd985f483f0aa7c6c10",
+          "n": 4,
+          "label_changed": true,
+          "gate_changed_at_047": true,
+          "choices": [
+            "answer",
+            "continuation"
+          ]
+        },
+        {
+          "request_hash": "6b46ab1adcbc963ed39ad5467f2a2adb9285f949ac12c00334a0a5ce2249ccaf",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "6043869fc3d415a586496216948a1b501557c1daa7beeaf30ee19899af3d1cd2",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "continuation"
+          ]
+        },
+        {
+          "request_hash": "80123aad78461945a0de779e904f9faad9bb7d4bc998808f4ec78b3f916b58e3",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "c1983752fefab904504a08b1dadcbebbdd8813c6a700d47ff69929e909914714",
+          "n": 4,
+          "label_changed": true,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer",
+            "clarify"
+          ]
+        },
+        {
+          "request_hash": "d2f7ef2a4a435e8168c64e3904e2dd284c4c1dda5a26f05202bcaf31298df2c0",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "50fb3b1e37de7fcefa6a488afb9dc0220c4198a37209bb88e6bc83e9ed0db7a8",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "efb0cf2149beac27714dd0079ef08104e215dc3dc68f01e4fb955daabb8a0755",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "401a78c0a4555c4f3cc215ce16e0e3adc9883c6ad08472d1b405ecec7402d298",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "1f1d6897be6a74c676ad43905e3cd7a569e9e7836f299dfbf6ff4a0388730267",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "f27f67aed7c6fe8ea2bbac78f1908ff8349885aef5c5307b3517765172288468",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "e41f6832d61715f616e6d31908cbed724cba6c5b014f34f57f7e52d2bb75325e",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "f01a08f41d5f1865742cb0003f76d51bdc43d160b23e16a24a042a91f6535e92",
+          "n": 4,
+          "label_changed": true,
+          "gate_changed_at_047": true,
+          "choices": [
+            "answer",
+            "ignore"
+          ]
+        },
+        {
+          "request_hash": "871301f5cb229de870491eb7329b4fa358c62a9eea2cf4745340d64d7e7eb678",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "0966c71eba09d92b65edef1b5da9638c85ec81003f681159235ae07020214d67",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "1949284f7724abc244c1e46ffa7b7093adb6493c6cba499463f8448159bdb9f5",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "9c6da199659f0af570699466f7b78de6b17cb68c5d97b4b28c9796a4b85100b5",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "69f3a7fce95fe6c85914b673e025c792990afd2a43a7e2c8bf2a0ed51c5596bf",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "answer"
+          ]
+        },
+        {
+          "request_hash": "8f46e55dbe23e4720b2f0c790b059ab2baae80bffdee281d82f8597c5a373f42",
+          "n": 4,
+          "label_changed": false,
+          "gate_changed_at_047": false,
+          "choices": [
+            "ignore"
+          ]
+        },
+        {
+          "request_hash": "79b4141c91f6ac2f0b110722fe431cd3b74ab6cede70ea10441de6d501fd9458",
+          "n": 4,
+          "label_changed": true,
+          "gate_changed_at_047": true,
+          "choices": [
+            "answer",
+            "ignore"
+          ]
+        }
+      ]
+    }
+  },
+  "raw_files": {
+    "development-validation-network.jsonl": {
+      "http": 2292,
+      "pair": 1146
+    },
+    "holdout-network.jsonl": {
+      "http": 748,
+      "pair": 374
+    },
+    "repetitions-network.jsonl": {
+      "http": 168,
+      "pair": 84
+    },
+    "sequence-network.jsonl": {
+      "sequence": 2592,
+      "http": 2168
+    }
+  }
+}

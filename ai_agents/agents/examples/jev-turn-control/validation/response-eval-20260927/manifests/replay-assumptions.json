@@ -1,0 +1,15 @@
+{
+  "status": "frozen before sequence provider collection; snapshot holdout already collected, no prompt/gold/threshold change",
+  "engines": ["78d44c91d2a7151da18a9d5e82b69b86dbbc1536", "bf4c21e1f70940b28e4e794e7b1db08624afaedb"],
+  "tick_ms": 20,
+  "asr_times": "exact frozen reference/synthetic event times, additional event boundary ticks",
+  "provider_latency": "recorded actual khipaa request latency, rounded up to next simulation tick; 800 ms deadline; identical cached body reuses same sampled outcome and latency",
+  "output_assumption": "no LLM or TTS: empty generated text, 1200 ms synthetic duration, complete playback ACK; initial assistant duration from frozen sequence",
+  "stop_ack_assumption": "next loop tick, cursor zero; this is not measured client/audio delay",
+  "sources": "synthetic and source-reference projections only; no new Soniox/voice calls",
+  "primary_snapshot": "final prefix+120ms, start after hypothetical floor release (assistant_speaking=false); separate stop probe while speaking where applicable",
+  "sequence": "actual begin_decision/complete_decision/tick/playback on immutable engine copies; A/B/C/D under BOTH provider outcomes; every queried state paired across providers",
+  "timing_arm": "fixed engine, prompt A, .47, one optional silence requery per input revision after 300/500/1000/2000ms only while idle pending, no in-flight request and no answer/clarify timer. External test driver resets last_decided; no production interface or timing changes",
+  "gold": "unchanged from data-freeze; misses refer to no response.start by horizon, early includes start before opportunity or any start on retained floor/ack",
+  "scope": "controller timing only, no acoustic-onset claims; source proxy labels retain uncertainty"
+}

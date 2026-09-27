@@ -1,0 +1,216 @@
+{
+  "provenance": "SEEN regression. Count prefix and complete request context reconstructed; visible question/selected label .42 and relevant times from prior investigation. Not an exact captured historic HTTP body. No claim that a new prompt fixed historical model semantics.",
+  "rows": [
+    {
+      "engine": "base",
+      "threshold": 0.47,
+      "supplied_observed_score": {
+        "label": "answer",
+        "score": 0.42,
+        "probabilities": {
+          "answer": 0.42,
+          "continuation": 0.43,
+          "clarify": 0.12,
+          "ignore": 0.02,
+          "explicit_wait": 0.01
+        }
+      },
+      "starts": [],
+      "pending_at_end": true,
+      "guidance_sent_at_end": true,
+      "model_request_reconstruction": {
+        "request_id": 2,
+        "revision": 2,
+        "epoch": 2,
+        "started_ms": 178380,
+        "kinds": [
+          "start"
+        ],
+        "state": {
+          "input_text": "How many digits are there?",
+          "asr_final": true,
+          "assistant_speaking": false,
+          "heard_context": [
+            {
+              "role": "user",
+              "text": "One. Three. Four."
+            },
+            {
+              "role": "assistant",
+              "text": "",
+              "response_id": "demo-r1",
+              "precision": "character_rate_estimate",
+              "confirmed": true,
+              "fully_played": false
+            }
+          ],
+          "older_context_summary": "",
+          "silence_ms": 126
+        }
+      },
+      "new_provider_call": false
+    },
+    {
+      "engine": "base",
+      "threshold": 0.42,
+      "supplied_observed_score": {
+        "label": "answer",
+        "score": 0.42,
+        "probabilities": {
+          "answer": 0.42,
+          "continuation": 0.43,
+          "clarify": 0.12,
+          "ignore": 0.02,
+          "explicit_wait": 0.01
+        }
+      },
+      "starts": [
+        {
+          "at_ms": 178754,
+          "mode": "answer"
+        }
+      ],
+      "pending_at_end": false,
+      "guidance_sent_at_end": false,
+      "model_request_reconstruction": {
+        "request_id": 2,
+        "revision": 2,
+        "epoch": 2,
+        "started_ms": 178380,
+        "kinds": [
+          "start"
+        ],
+        "state": {
+          "input_text": "How many digits are there?",
+          "asr_final": true,
+          "assistant_speaking": false,
+          "heard_context": [
+            {
+              "role": "user",
+              "text": "One. Three. Four."
+            },
+            {
+              "role": "assistant",
+              "text": "",
+              "response_id": "demo-r1",
+              "precision": "character_rate_estimate",
+              "confirmed": true,
+              "fully_played": false
+            }
+          ],
+          "older_context_summary": "",
+          "silence_ms": 126
+        }
+      },
+      "new_provider_call": false
+    },
+    {
+      "engine": "fixed",
+      "threshold": 0.47,
+      "supplied_observed_score": {
+        "label": "answer",
+        "score": 0.42,
+        "probabilities": {
+          "answer": 0.42,
+          "continuation": 0.43,
+          "clarify": 0.12,
+          "ignore": 0.02,
+          "explicit_wait": 0.01
+        }
+      },
+      "starts": [
+        {
+          "at_ms": 183254,
+          "mode": "clarify"
+        }
+      ],
+      "pending_at_end": false,
+      "guidance_sent_at_end": true,
+      "model_request_reconstruction": {
+        "request_id": 2,
+        "revision": 2,
+        "epoch": 2,
+        "started_ms": 178380,
+        "kinds": [
+          "start"
+        ],
+        "state": {
+          "input_text": "How many digits are there?",
+          "asr_final": true,
+          "assistant_speaking": false,
+          "heard_context": [
+            {
+              "role": "user",
+              "text": "One. Three. Four."
+            },
+            {
+              "role": "assistant",
+              "text": "",
+              "response_id": "demo-r1",
+              "precision": "character_rate_estimate",
+              "confirmed": true,
+              "fully_played": false
+            }
+          ],
+          "older_context_summary": "",
+          "silence_ms": 126
+        }
+      },
+      "new_provider_call": false
+    },
+    {
+      "engine": "fixed",
+      "threshold": 0.42,
+      "supplied_observed_score": {
+        "label": "answer",
+        "score": 0.42,
+        "probabilities": {
+          "answer": 0.42,
+          "continuation": 0.43,
+          "clarify": 0.12,
+          "ignore": 0.02,
+          "explicit_wait": 0.01
+        }
+      },
+      "starts": [
+        {
+          "at_ms": 178754,
+          "mode": "answer"
+        }
+      ],
+      "pending_at_end": false,
+      "guidance_sent_at_end": false,
+      "model_request_reconstruction": {
+        "request_id": 2,
+        "revision": 2,
+        "epoch": 2,
+        "started_ms": 178380,
+        "kinds": [
+          "start"
+        ],
+        "state": {
+          "input_text": "How many digits are there?",
+          "asr_final": true,
+          "assistant_speaking": false,
+          "heard_context": [
+            {
+              "role": "user",
+              "text": "One. Three. Four."
+            },
+            {
+              "role": "assistant",
+              "text": "",
+              "response_id": "demo-r1",
+              "precision": "character_rate_estimate",
+              "confirmed": true,
+              "fully_played": false
+            }
+          ],
+          "older_context_summary": "",
+          "silence_ms": 126
+        }
+      },
+      "new_provider_call": false
+    }
+  ]
+}

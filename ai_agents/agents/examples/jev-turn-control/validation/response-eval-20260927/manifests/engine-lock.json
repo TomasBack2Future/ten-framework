@@ -1,0 +1,19 @@
+{
+  "base_sha": "78d44c91d2a7151da18a9d5e82b69b86dbbc1536",
+  "fixed_sha": "bf4c21e1f70940b28e4e794e7b1db08624afaedb",
+  "source_path": "ai_agents/agents/ten_packages/extension/jev_turn_control_python",
+  "sha256": {
+    "reference/config.py": "6e0320715e00b3ab07d861b95f18fcfe53337ea740b02458087142817c9e91b7",
+    "reference/provider.py": "4f2d279ff6149e8cb931b2786eb448e3dc3412ded27d49df85ab3ed4f255e81e",
+    "reference/baseline_questions.json": "830d6cc2bb36d541d0eff91fb24a0efec022a4d88ca617f73715da8c92cfd193",
+    "reference/engine.py": "c2bb5f2a156d61bb4f16a194dd7168f41bc1817382a4e25a1dd4dc78b63760d4",
+    "reference/profiles.py": "64a1c31ad7722bda1106c52c885e84a64e4fb08baa7fc30d2aaa5f277b8e9901",
+    "reference/decision_profiles.json": "b4f800f96afa4e95da3a5547c776e6d4fa1a42bd20ba768684af85743337c95a",
+    "reference-fixed/config.py": "6e0320715e00b3ab07d861b95f18fcfe53337ea740b02458087142817c9e91b7",
+    "reference-fixed/provider.py": "4f2d279ff6149e8cb931b2786eb448e3dc3412ded27d49df85ab3ed4f255e81e",
+    "reference-fixed/baseline_questions.json": "830d6cc2bb36d541d0eff91fb24a0efec022a4d88ca617f73715da8c92cfd193",
+    "reference-fixed/engine.py": "b56953d859086eaa80b021bc3a0ea4b54b829d05e099a0862ed6cdbd3b051384",
+    "reference-fixed/profiles.py": "64a1c31ad7722bda1106c52c885e84a64e4fb08baa7fc30d2aaa5f277b8e9901",
+    "reference-fixed/decision_profiles.json": "b4f800f96afa4e95da3a5547c776e6d4fa1a42bd20ba768684af85743337c95a"
+  }
+}
