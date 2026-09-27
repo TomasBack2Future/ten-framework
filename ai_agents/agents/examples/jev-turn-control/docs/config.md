@@ -20,19 +20,41 @@ that rubric. Probabilities are provider outputs; mock output is labeled mock.
 
 Scheduling: merge_ms 80, min_interval_ms 120, max_wait_ms 5000, max_inflight 1.
 One in-flight request finishes; one overwritten latest-input mailbox replaces
-an unbounded queue. No cancel/restart on partial. Revision/response epoch reject
-obsolete results. The absolute wait deadline is anchored to the first pending
-input and cannot be extended by subsequent partial/final events.
+an unbounded queue. Listening waits for a stable partial for at least
+max(merge_ms, min_interval_ms). Speaking keeps a bounded merge delay for stop
+judgments; it does not also ask a speculative start question. Backchannel
+playback can still be preempted by an accepted main response. No cancel/restart
+on partial. Immutable request IDs and revision/response epoch fences reject
+obsolete results. Request context is a deep snapshot; late word alignment cannot
+pin a request in flight. Whitespace-only duplicate input does not revise state.
 
-Waits: answer 250 ms; clarify 900; continuation 1400; explicit_wait 4000;
-ignore 1800. Timers are invalidated by new input, stop, pause or disconnect.
-At a bounded deadline, answer starts an answer; incomplete/wait starts a brief
-clarification; ignore consumes the input without speaking. Final alone grants
-no start permission. Agent EOS is ignored.
+The maximum response wait is measured from the LAST input, never the first
+partial in a long utterance. A confident continuation keeps the user's floor.
+Only sustained silence at max_wait_ms can produce one bounded clarification;
+further incomplete fragments cannot repeatedly prompt until an accepted main
+answer/clarification resets that guidance budget. wait.continuation_ms remains
+accepted for v1 compatibility but no longer schedules an automatic clarification.
+
+Waits: answer 250 ms; clarify 900; explicit_wait 4000; ignore 1800. Wait/ignore
+consume input without speaking, including low-confidence labels as conservative
+vetoes. Timers are invalidated by new input, stop or disconnect. Pause suspends
+the accepted timer label and its remaining delay; resume restores it only if its
+input revision still matches. New input while paused gets a fresh decision.
+Final alone grants no start permission. Agent EOS is ignored.
+
+Start threshold is .6. For a final segment with a below-threshold winning label,
+answer+clarify probability can satisfy the parent "ready to respond" category.
+The larger child probability selects answer versus clarify; a tie clarifies.
+This does not override an explicit_wait/ignore label. Observations retain the
+provider's original label/score and record effective_label/effective_score when
+applying a start policy. This is a timing policy, not proof of semantic accuracy.
 
 Backchannel defaults off. Allowed phrases `["Mm-hmm.", "I see."]`, cooldown
-5000 ms, result validity 600 ms, threshold .8. It never starts while a main
-response or stop acknowledgment is active. Stop threshold .65; start .6.
+5000 ms, result validity 600 ms, threshold .8. Only continuation allows it;
+answer, clarify, wait and ignore veto it. It never starts while a main response
+or stop acknowledgment is active. Stop threshold .65. A backchannel older than
+600 ms is intentionally dropped even if the provider succeeds within its 800 ms
+timeout: a late acknowledgment should not interrupt a newly developing thought.
 
 Observation enabled, include_text false, buffer_limit 256 (range 16–4096).
 Text fields are redacted by default. `state.snapshot` reconstructs UI state and
