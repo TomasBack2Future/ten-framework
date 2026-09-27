@@ -24,12 +24,14 @@ class TurnEngine:
         self.committed = ""
         self.final = False
         self.pending = False
+        self.input_cycle = 0
         self.first_input = 0
         self.last_input = 0
         self.last_request = -100000
         self.inflight = None
         self.request_seq = 0
         self.last_decided = -1
+        self.last_start_decided = -1
         self.last_decided_speaking = None
         self.timer = None
         self.timer_seq = 0
@@ -104,6 +106,7 @@ class TurnEngine:
                 )
             ),
             "pending": self.pending,
+            "input_cycle": self.input_cycle,
             "text": self.text,
             "response_epoch": self.epoch,
             "active_response_id": self.active,
@@ -133,10 +136,12 @@ class TurnEngine:
                 self.committed = self.text
             self.segment = segment_id
         combined = (self.committed + " " + text).strip()[-16000:]
-        if combined == self.text and final == self.final:
+        if self.pending and combined == self.text and final == self.final:
             return
         if not self.pending:
             self.first_input = now
+            self.input_cycle += 1
+            self.guidance_sent = False
         self.pending = True
         self.text, self.final = combined, final
         self.revision += 1
@@ -151,6 +156,28 @@ class TurnEngine:
                 "segment_id": segment_id,
                 "characters": len(self.text),
             },
+        )
+
+    def consume_input(self, reason, clear_text=True):
+        """End one input cycle without erasing committed conversation memory."""
+        self.pending = False
+        if self.segment:
+            self.consumed_segment = self.segment
+            self.consumed_text = self.text[len(self.committed) :].strip()
+        self.committed = ""
+        self.segment = ""
+        self.cancel_timer(reason)
+        if clear_text:
+            self.text = ""
+            self.final = False
+        self.emit(
+            "input.consumed", {"reason": reason, "cycle": self.input_cycle}
+        )
+
+    def awaiting_start_decision(self):
+        """A stop/continue judgment cannot authorize a later main response."""
+        return self.config["turn"]["enabled"] and (
+            self.last_start_decided != self.revision
         )
 
     def cancel_timer(self, reason):
@@ -269,6 +296,7 @@ class TurnEngine:
         self.inflight = None
         stale = (
             self.closed
+            or not self.pending
             or request["revision"] != self.revision
             or request["epoch"] != self.epoch
         )
@@ -276,9 +304,13 @@ class TurnEngine:
             "closed"
             if self.closed
             else (
-                "input_revision"
-                if request["revision"] != self.revision
-                else "response_epoch"
+                "input_consumed"
+                if not self.pending
+                else (
+                    "input_revision"
+                    if request["revision"] != self.revision
+                    else "response_epoch"
+                )
             )
         )
         for kind in request["kinds"]:
@@ -302,6 +334,8 @@ class TurnEngine:
         if stale:
             return
         self.last_decided = self.revision
+        if "start" in request["kinds"]:
+            self.last_start_decided = self.revision
         self.last_decided_speaking = request["state"]["assistant_speaking"]
         if error:
             self.failed = True
@@ -431,6 +465,8 @@ class TurnEngine:
             or not self.config["start"]["enabled"]
         ):
             return
+        if self.awaiting_start_decision():
+            return
         if self.failed and self.config["provider"]["failure_policy"] == "hold":
             return
         maximum = (
@@ -456,7 +492,7 @@ class TurnEngine:
             )
         self.timer = None
         if label in ("ignore", "explicit_wait"):
-            self.pending = False
+            self.consume_input(label)
             return
         if guidance:
             self.guidance_sent = True
@@ -500,14 +536,12 @@ class TurnEngine:
             "audio_ms": 0,
             "audio_chunk_floor_ms": 0,
             "fully_played": False,
+            "stop_requested": False,
+            "terminal": None,
+            "terminal_confirmed": False,
         }
         if mode not in ("backchannel", "executor_result"):
-            self.pending = False
-            self.consumed_segment = self.segment
-            self.consumed_text = self.text[len(self.committed) :].strip()
-            self.committed = ""
-            self.segment = ""
-            self.cancel_timer("response_started")
+            self.consume_input("response_started", clear_text=False)
         self.emit(
             "response.started",
             {
@@ -544,11 +578,14 @@ class TurnEngine:
             self.context_revision += 1
 
     def stop(self, reason):
+        if reason in ("manual_stop", "buffer_limit"):
+            self.consume_input(reason)
         if not self.active:
             return
         rid, self.active = self.active, None
         self.epoch += 1
         self.stopping = rid
+        self.responses[rid]["stop_requested"] = True
         self.responses[rid]["stop_deadline"] = (
             self.now + self.config["playback"]["stop_ack_timeout_ms"]
         )
@@ -694,6 +731,39 @@ class TurnEngine:
                 rid,
             )
 
+    @staticmethod
+    def completion_verified(response):
+        """A terminal flag cannot replace independent generated/played bounds."""
+        return bool(
+            not response["stop_requested"]
+            and response["generation_done"]
+            and response["audio_done"]
+            and not response["audio_failed"]
+            and response["audio_ms"] > 0
+            and response["expected_audio_ms"] is not None
+            and (
+                abs(response["audio_ms"] - response["expected_audio_ms"]) <= 2
+                or response["expected_audio_ms"]
+                == response["audio_chunk_floor_ms"]
+            )
+            and response["played_ms"] >= response["audio_ms"] - 30
+        )
+
+    def revise_playback_history(self, rid, response, confirmed):
+        heard, precision = self.heard(response)
+        for item in self.history:
+            if item.get("response_id") == rid:
+                update = {
+                    "text": heard,
+                    "precision": precision,
+                    "confirmed": confirmed,
+                    "fully_played": response["fully_played"],
+                }
+                if any(item.get(key) != value for key, value in update.items()):
+                    item.update(update)
+                    self.context_revision += 1
+        return heard, precision
+
     def playback(
         self,
         rid,
@@ -704,36 +774,32 @@ class TurnEngine:
         confirmed=True,
     ):
         self.now = now
-        if rid in self.finished and stopped:
-            response = self.finished[rid]
-            if response["fully_played"]:
-                return
-            response["played_ms"] = min(
-                max(0, played_ms), response["audio_ms"] or 3600000
-            )
-            heard, precision = self.heard(response)
-            for item in self.history:
-                if item.get("response_id") == rid:
-                    item.update(
-                        text=heard, precision=precision, confirmed=confirmed
-                    )
-                    self.context_revision += 1
-            self.emit(
-                "playback.stopped",
-                {
-                    "played_ms": response["played_ms"],
-                    "heard_text": heard,
-                    "precision": precision,
-                    "confirmed": confirmed,
-                    "late_ack": True,
-                },
-                rid,
-            )
+        if (
+            isinstance(played_ms, bool)
+            or not isinstance(played_ms, (int, float))
+            or not math.isfinite(played_ms)
+        ):
             return
-        if rid not in self.responses or rid not in (self.active, self.stopping):
+        late = rid in self.finished
+        response = self.finished.get(rid) if late else self.responses.get(rid)
+        if response is None or (
+            not late and rid not in (self.active, self.stopping)
+        ):
             return
-        response = self.responses[rid]
         cursor = min(max(0, played_ms), response["audio_ms"] or 3600000)
+        if late:
+            # A confirmed stop is terminal. A timeout can be corrected once,
+            # but a completed ACK must never promote cancelled speech to full.
+            if not confirmed or response["fully_played"]:
+                return
+            if response["terminal"] == "stopped":
+                if not stopped or response["terminal_confirmed"]:
+                    return
+            elif not (stopped or completed):
+                return
+            elif completed and not stopped and cursor <= response["played_ms"]:
+                return
+        stopped = stopped or bool(completed and response["stop_requested"])
         response["played_ms"] = (
             cursor
             if confirmed and (stopped or completed)
@@ -743,36 +809,41 @@ class TurnEngine:
             completed
             and not stopped
             and confirmed
-            and response["generation_done"]
-            and response["audio_done"]
-            and response["audio_ms"] > 0
-            # Accept either a rounded total or the exact sum of per-chunk
-            # integer durations used by Cartesia. Do not widen the tolerance:
-            # missing/duplicated chunks must also change this independent sum.
-            and response["expected_audio_ms"] is not None
-            and (
-                abs(response["audio_ms"] - response["expected_audio_ms"]) <= 2
-                or response["expected_audio_ms"]
-                == response["audio_chunk_floor_ms"]
+            and self.completion_verified(response)
+        )
+        response["unverified_completion"] = bool(
+            completed and not stopped and not response["fully_played"]
+        )
+        if stopped or completed:
+            response["terminal"] = "stopped" if stopped else "completed"
+            response["terminal_confirmed"] = confirmed
+        if late:
+            heard, precision = self.revise_playback_history(
+                rid, response, confirmed
             )
-            and response["played_ms"] >= response["audio_ms"] - 30
-        )
-        response["unverified_completion"] = (
-            completed and not response["fully_played"]
-        )
-        heard, precision = self.heard(response)
+        else:
+            heard, precision = self.heard(response)
         response["precision"] = precision
+        payload = {
+            "played_ms": response["played_ms"],
+            "heard_text": heard,
+            "precision": precision,
+            "confirmed": confirmed,
+            "completed": completed and not stopped,
+            "fully_played": response["fully_played"],
+        }
+        if late:
+            payload["late_ack"] = True
+        if completed and not response["fully_played"]:
+            payload["completion_verified"] = False
+            payload["remaining_audio_ms"] = max(
+                0, response["audio_ms"] - response["played_ms"]
+            )
         self.emit(
-            "playback.stopped" if stopped else "playback.progress",
-            {
-                "played_ms": response["played_ms"],
-                "heard_text": heard,
-                "precision": precision,
-                "confirmed": confirmed,
-                "completed": completed,
-            },
-            rid,
+            "playback.stopped" if stopped else "playback.progress", payload, rid
         )
+        if late:
+            return
         if stopped or completed:
             if response["mode"] != "backchannel":
                 self.history.append(

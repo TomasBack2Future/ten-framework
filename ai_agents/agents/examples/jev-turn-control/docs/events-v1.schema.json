@@ -45,6 +45,7 @@
     "type": {
       "enum": [
         "asr.updated",
+        "input.consumed",
         "decision.started",
         "decision.completed",
         "decision.discarded",
