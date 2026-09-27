@@ -1,0 +1,89 @@
+{
+  "jev": {
+    "n": 30,
+    "errors": 0,
+    "confusion_matrix": {
+      "conversation": {
+        "conversation": 9,
+        "execute": 1,
+        "clarify": 0,
+        "task_control": 2,
+        "error": 0
+      },
+      "execute": {
+        "conversation": 0,
+        "execute": 7,
+        "clarify": 0,
+        "task_control": 0,
+        "error": 0
+      },
+      "clarify": {
+        "conversation": 0,
+        "execute": 0,
+        "clarify": 0,
+        "task_control": 2,
+        "error": 0
+      },
+      "task_control": {
+        "conversation": 0,
+        "execute": 0,
+        "clarify": 0,
+        "task_control": 9,
+        "error": 0
+      }
+    },
+    "accuracy": 0.8333333333333334,
+    "execute_precision": 0.875,
+    "execute_recall": 1.0,
+    "false_execution_rate": 0.03571428571428571,
+    "support_accuracy": 0.8333333333333334,
+    "p50_latency_ms": 796.5544579783455,
+    "max_latency_ms": 1974.0744580049068,
+    "cost_usd": null
+  },
+  "scaledown": {
+    "n": 30,
+    "errors": 0,
+    "confusion_matrix": {
+      "conversation": {
+        "conversation": 7,
+        "execute": 1,
+        "clarify": 0,
+        "task_control": 4,
+        "error": 0
+      },
+      "execute": {
+        "conversation": 0,
+        "execute": 7,
+        "clarify": 0,
+        "task_control": 0,
+        "error": 0
+      },
+      "clarify": {
+        "conversation": 0,
+        "execute": 0,
+        "clarify": 0,
+        "task_control": 2,
+        "error": 0
+      },
+      "task_control": {
+        "conversation": 0,
+        "execute": 0,
+        "clarify": 0,
+        "task_control": 9,
+        "error": 0
+      }
+    },
+    "accuracy": 0.7666666666666667,
+    "execute_precision": 0.875,
+    "execute_recall": 1.0,
+    "false_execution_rate": 0.0,
+    "support_accuracy": 0.8666666666666667,
+    "p50_latency_ms": 1928.3145415247418,
+    "max_latency_ms": 3877.4075829423964,
+    "cost_usd": null
+  },
+  "dataset_sha256": "f041839b4a795acf474a7c5aa5435fea64457e543608883c0c5362656431218a",
+  "split": "dev",
+  "variant": "baseline"
+}

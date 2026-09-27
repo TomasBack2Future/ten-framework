@@ -1,0 +1,12 @@
+version: '3'
+tasks:
+  format:
+    cmds: ['black --line-length 80 .']
+  check:
+    cmds: ['black --check --line-length 80 .']
+  lint:
+    cmds: ['PYTHONPATH=.. pylint --rcfile=pylintrc *.py']
+  test:
+    cmds: ['PYTHONPATH=.. python3 -m unittest discover -s tests -v']
+  sandbox:
+    cmds: ['PYTHONPATH=.. python3 -m executor.sandbox --output results/sandbox-fake.jsonl']

@@ -1,0 +1,62 @@
+{
+  "sdk": "0.157.1",
+  "isolated_home": true,
+  "account_present": false,
+  "model": "gpt-6-luna",
+  "catalog": [
+    {
+      "additional_speed_tiers": [
+        "fast"
+      ],
+      "availability_nux": null,
+      "available_access_programs": null,
+      "default_reasoning_effort": "medium",
+      "default_service_tier": "priority",
+      "description": "Fast and affordable model for easier tasks.",
+      "display_name": "GPT-6-Luna",
+      "hidden": false,
+      "id": "gpt-6-luna",
+      "input_modalities": [
+        "text",
+        "image"
+      ],
+      "is_default": false,
+      "model": "gpt-6-luna",
+      "model_specialty": null,
+      "multi_agent_version": "v2",
+      "service_tiers": [
+        {
+          "description": "1.5x speed",
+          "id": "priority",
+          "name": "Fast"
+        }
+      ],
+      "supported_reasoning_efforts": [
+        {
+          "description": "Fast responses with lighter reasoning",
+          "reasoning_effort": "low"
+        },
+        {
+          "description": "Balances speed and reasoning depth for everyday tasks",
+          "reasoning_effort": "medium"
+        },
+        {
+          "description": "Greater reasoning depth for complex problems",
+          "reasoning_effort": "high"
+        },
+        {
+          "description": "Extra high reasoning depth for complex problems",
+          "reasoning_effort": "xhigh"
+        },
+        {
+          "description": "Maximum reasoning depth for the hardest problems",
+          "reasoning_effort": "max"
+        }
+      ],
+      "supports_personality": false,
+      "upgrade": null,
+      "upgrade_info": null
+    }
+  ],
+  "live_execution": "blocked_no_authorized_deployment_credential"
+}
