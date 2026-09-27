@@ -1,0 +1,10 @@
+{"at_ms":0,"type":"asr","text":"What is the weather?","final":false,"segment_id":"u1"}
+{"at_ms":120,"type":"decision.started"}
+{"at_ms":203,"type":"decision.completed","answers":{"start":{"label":"answer","score":0.92,"probabilities":{"answer":0.92,"clarify":0.03,"continuation":0.03,"explicit_wait":0.01,"ignore":0.01}}}}
+{"at_ms":453,"type":"tick"}
+{"at_ms":480,"type":"output","text":"The weather is sunny in San Francisco."}
+{"at_ms":980,"type":"playback","played_ms":500}
+{"at_ms":1000,"type":"asr","text":"Wait, I meant tomorrow.","final":false,"segment_id":"u2"}
+{"at_ms":1120,"type":"decision.started"}
+{"at_ms":1203,"type":"decision.completed","answers":{"stop":{"label":"stop","score":0.97,"probabilities":{"stop":0.97,"continue":0.03}},"start":{"label":"answer","score":0.9,"probabilities":{"answer":0.9,"clarify":0.1}}}}
+{"at_ms":1210,"type":"playback","played_ms":700,"stopped":true}

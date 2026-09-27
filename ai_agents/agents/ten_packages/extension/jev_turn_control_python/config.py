@@ -1,0 +1,142 @@
+"""Validated session-start settings; secrets are referenced, never serialized."""
+
+from dataclasses import dataclass, field
+from copy import deepcopy
+
+DEFAULTS = {
+    "turn": {"enabled": True},
+    "start": {"enabled": True, "prompt": "", "threshold": 0.6},
+    "stop": {
+        "enabled": True,
+        "prompt": "",
+        "threshold": 0.65,
+        "max_wait_ms": 800,
+    },
+    "backchannel": {
+        "enabled": False,
+        "prompt": "",
+        "threshold": 0.8,
+        "phrases": ["Mm-hmm.", "I see."],
+        "cooldown_ms": 5000,
+        "valid_ms": 600,
+    },
+    "provider": {
+        "name": "mock",
+        "model": "jev-latest",
+        "endpoint": "https://api.typesafe.ai/v1/systemone",
+        "secret_env": "JEV_API_KEY",
+        "timeout_ms": 800,
+        "failure_policy": "bounded_wait",
+    },
+    "scheduling": {
+        "merge_ms": 80,
+        "min_interval_ms": 120,
+        "max_wait_ms": 5000,
+        "max_inflight": 1,
+    },
+    "wait": {
+        "answer_ms": 250,
+        "clarify_ms": 900,
+        "continuation_ms": 1400,
+        "explicit_wait_ms": 4000,
+        "ignore_ms": 1800,
+    },
+    "observation": {
+        "enabled": True,
+        "include_text": False,
+        "buffer_limit": 256,
+    },
+    "playback": {
+        "stop_ack_timeout_ms": 500,
+        "chars_per_second": 14,
+        "context_responses": 12,
+    },
+    "transport": {"enabled": False, "mock_audio": False},
+}
+
+
+@dataclass
+class Config:
+    """Reject unknown options, incompatible limits and unsafe endpoints."""
+
+    values: dict = field(default_factory=lambda: deepcopy(DEFAULTS))
+
+    @classmethod
+    def load(cls, raw=None):
+        values = deepcopy(DEFAULTS)
+        for section, options in (raw or {}).items():
+            if section not in values or not isinstance(options, dict):
+                raise ValueError("unknown configuration section")
+            for key, value in options.items():
+                if key not in values[section]:
+                    raise ValueError(f"unknown option: {section}.{key}")
+                default = values[section][key]
+                if isinstance(default, bool):
+                    valid = isinstance(value, bool)
+                elif isinstance(default, int):
+                    valid = isinstance(value, int) and not isinstance(
+                        value, bool
+                    )
+                elif isinstance(default, float):
+                    valid = isinstance(value, (int, float)) and not isinstance(
+                        value, bool
+                    )
+                else:
+                    valid = isinstance(value, type(default))
+                if not valid:
+                    raise ValueError(f"invalid type: {section}.{key}")
+                values[section][key] = value
+        cfg = cls(values)
+        cfg.validate()
+        return cfg
+
+    def __getitem__(self, key):
+        return self.values[key]
+
+    def validate(self):
+        for section, options in self.values.items():
+            for key, value in options.items():
+                if key.endswith("_ms") and not 0 <= value <= 60000:
+                    raise ValueError(f"out of range: {section}.{key}")
+                if key == "prompt" and len(value) > 2000:
+                    raise ValueError("prompt exceeds 2000 characters")
+                if key == "threshold" and not 0 <= value <= 1:
+                    raise ValueError("threshold outside [0,1]")
+        sched = self["scheduling"]
+        if sched["max_inflight"] != 1:
+            raise ValueError(
+                "MVP supports exactly one in-flight provider request"
+            )
+        if not 100 <= sched["max_wait_ms"] <= 30000:
+            raise ValueError("max_wait_ms outside [100,30000]")
+        if (
+            max(sched["merge_ms"], sched["min_interval_ms"])
+            > sched["max_wait_ms"]
+        ):
+            raise ValueError("trigger interval exceeds max wait")
+        if not 50 <= self["provider"]["timeout_ms"] <= 10000:
+            raise ValueError("provider timeout outside [50,10000]")
+        if self["provider"]["name"] not in ("mock", "jev"):
+            raise ValueError(
+                "provider must be mock or jev; ScaleDown is offline only"
+            )
+        if self["provider"]["failure_policy"] not in ("bounded_wait", "hold"):
+            raise ValueError("invalid failure policy")
+        if not self["provider"]["endpoint"].startswith("https://"):
+            raise ValueError("provider requires HTTPS")
+        name = self["provider"]["secret_env"]
+        if not name or not name.replace("_", "").isalnum():
+            raise ValueError("secret_env must be an environment variable name")
+        if not 16 <= self["observation"]["buffer_limit"] <= 4096:
+            raise ValueError("buffer_limit outside [16,4096]")
+        if not 1 <= self["playback"]["context_responses"] <= 64:
+            raise ValueError("context_responses outside [1,64]")
+        if not 1 <= self["playback"]["chars_per_second"] <= 50:
+            raise ValueError("chars_per_second outside [1,50]")
+        phrases = self["backchannel"]["phrases"]
+        if not 1 <= len(phrases) <= 8 or any(
+            not isinstance(p, str) or not 1 <= len(p) <= 40 for p in phrases
+        ):
+            raise ValueError(
+                "backchannel requires 1-8 short phrases (1-40 characters)"
+            )

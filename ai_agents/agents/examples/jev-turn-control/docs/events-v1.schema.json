@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Jev demo observation event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "event_id",
+    "seq",
+    "session_id",
+    "relative_time_ms",
+    "type",
+    "input_revision",
+    "response_id",
+    "payload"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "event_id": {
+      "type": "string"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "relative_time_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "input_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "type": {
+      "enum": [
+        "asr.updated",
+        "decision.started",
+        "decision.completed",
+        "decision.discarded",
+        "timer.scheduled",
+        "timer.fired",
+        "timer.cancelled",
+        "response.started",
+        "response.cancelled",
+        "response.discarded",
+        "response.audio_completed",
+        "task.started",
+        "task.progress",
+        "task.completed",
+        "task.cancelled",
+        "task.error",
+        "playback.progress",
+        "playback.stopped",
+        "state.snapshot",
+        "error",
+        "response.text"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    }
+  }
+}
