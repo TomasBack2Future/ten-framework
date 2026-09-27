@@ -1,0 +1,27 @@
+{
+  "aliases": {
+    "speech_vs_task": "speech_and_cancellation",
+    "stop_reading": "speech_and_cancellation",
+    "speech_keep": "speech_and_cancellation",
+    "task_pause": "speech_and_cancellation",
+    "cancel_context": "speech_and_cancellation",
+    "task_cancel_negated": "speech_and_cancellation",
+    "conditional": "conditional",
+    "hypothetical_en": "conditional",
+    "negation": "negation",
+    "negation_en": "negation",
+    "partial_rewrite": "negation",
+    "quotation": "quotation",
+    "quoted_en": "quotation",
+    "task_quote": "quotation",
+    "status_context": "task_progress",
+    "progress": "task_progress",
+    "task_status_en": "task_progress",
+    "missing_filename": "missing_reference",
+    "partial_object": "missing_reference",
+    "chitchat": "social",
+    "thanks": "social",
+    "greeting": "social"
+  },
+  "boundary": "All pilot samples were authored, inspected or evaluated before regrouping. No new unseen holdout is claimed."
+}

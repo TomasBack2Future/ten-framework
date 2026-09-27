@@ -1,0 +1,46 @@
+{
+  "ten": {
+    "predefined_graphs": [
+      {
+        "name": "jev_turn_control",
+        "auto_start": true,
+        "graph": {
+          "nodes": [
+            {
+              "type": "extension",
+              "name": "turn_control",
+              "addon": "jev_turn_control_python",
+              "extension_group": "turn_control",
+              "property": {
+                "provider": {
+                  "name": "mock"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "log": {
+      "handlers": [
+        {
+          "matchers": [
+            {
+              "level": "info"
+            }
+          ],
+          "formatter": {
+            "type": "plain",
+            "colored": false
+          },
+          "emitter": {
+            "type": "console",
+            "config": {
+              "stream": "stdout"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

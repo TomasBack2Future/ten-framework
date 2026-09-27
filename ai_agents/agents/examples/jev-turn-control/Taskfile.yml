@@ -1,0 +1,16 @@
+version: "3"
+tasks:
+  install:
+    cmds: ["./scripts/install.sh"]
+  build:
+    cmds: ["python3 -m compileall -q tenapp/main.py ../../ten_packages/extension/jev_turn_control_python tests"]
+  format:
+    cmds: ["black --line-length 80 tenapp/main.py ../../ten_packages/extension/jev_turn_control_python tests"]
+  check:
+    cmds: ["./scripts/check.sh"]
+  smoke:
+    cmds: ["./scripts/smoke.sh"]
+  run:
+    cmds: ["./scripts/start.sh"]
+  official-smoke:
+    cmds: ["./scripts/official-smoke.sh"]

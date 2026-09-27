@@ -1,0 +1,266 @@
+{
+  "variant": "refined",
+  "execute_threshold": 0.75,
+  "reason": "lowest tested dev threshold eliminating Jev false dispatch; shared threshold for both providers",
+  "dev_threshold_candidates": {
+    "0.65": {
+      "jev": {
+        "n": 30,
+        "errors": 0,
+        "confusion_matrix": {
+          "conversation": {
+            "conversation": 11,
+            "execute": 1,
+            "clarify": 0,
+            "task_control": 0,
+            "error": 0
+          },
+          "execute": {
+            "conversation": 0,
+            "execute": 7,
+            "clarify": 0,
+            "task_control": 0,
+            "error": 0
+          },
+          "clarify": {
+            "conversation": 0,
+            "execute": 0,
+            "clarify": 2,
+            "task_control": 0,
+            "error": 0
+          },
+          "task_control": {
+            "conversation": 0,
+            "execute": 0,
+            "clarify": 0,
+            "task_control": 9,
+            "error": 0
+          }
+        },
+        "accuracy": 0.9666666666666667,
+        "execute_precision": 0.875,
+        "execute_recall": 1.0,
+        "false_execution_rate": 0.03571428571428571,
+        "support_accuracy": 0.9666666666666667,
+        "p50_latency_ms": 796.3389794458635,
+        "max_latency_ms": 2401.22954105027,
+        "cost_usd": null
+      },
+      "scaledown": {
+        "n": 30,
+        "errors": 0,
+        "confusion_matrix": {
+          "conversation": {
+            "conversation": 8,
+            "execute": 1,
+            "clarify": 0,
+            "task_control": 3,
+            "error": 0
+          },
+          "execute": {
+            "conversation": 0,
+            "execute": 6,
+            "clarify": 1,
+            "task_control": 0,
+            "error": 0
+          },
+          "clarify": {
+            "conversation": 0,
+            "execute": 0,
+            "clarify": 2,
+            "task_control": 0,
+            "error": 0
+          },
+          "task_control": {
+            "conversation": 0,
+            "execute": 0,
+            "clarify": 0,
+            "task_control": 9,
+            "error": 0
+          }
+        },
+        "accuracy": 0.8333333333333334,
+        "execute_precision": 0.8571428571428571,
+        "execute_recall": 0.8571428571428571,
+        "false_execution_rate": 0.0,
+        "support_accuracy": 0.9666666666666667,
+        "p50_latency_ms": 1770.5124164931476,
+        "max_latency_ms": 5530.34379100427,
+        "cost_usd": null
+      }
+    },
+    "0.75": {
+      "jev": {
+        "n": 30,
+        "errors": 0,
+        "confusion_matrix": {
+          "conversation": {
+            "conversation": 11,
+            "execute": 0,
+            "clarify": 1,
+            "task_control": 0,
+            "error": 0
+          },
+          "execute": {
+            "conversation": 0,
+            "execute": 7,
+            "clarify": 0,
+            "task_control": 0,
+            "error": 0
+          },
+          "clarify": {
+            "conversation": 0,
+            "execute": 0,
+            "clarify": 2,
+            "task_control": 0,
+            "error": 0
+          },
+          "task_control": {
+            "conversation": 0,
+            "execute": 0,
+            "clarify": 0,
+            "task_control": 9,
+            "error": 0
+          }
+        },
+        "accuracy": 0.9666666666666667,
+        "execute_precision": 1.0,
+        "execute_recall": 1.0,
+        "false_execution_rate": 0.0,
+        "support_accuracy": 0.9666666666666667,
+        "p50_latency_ms": 796.3389794458635,
+        "max_latency_ms": 2401.22954105027,
+        "cost_usd": null
+      },
+      "scaledown": {
+        "n": 30,
+        "errors": 0,
+        "confusion_matrix": {
+          "conversation": {
+            "conversation": 8,
+            "execute": 1,
+            "clarify": 0,
+            "task_control": 3,
+            "error": 0
+          },
+          "execute": {
+            "conversation": 0,
+            "execute": 6,
+            "clarify": 1,
+            "task_control": 0,
+            "error": 0
+          },
+          "clarify": {
+            "conversation": 0,
+            "execute": 0,
+            "clarify": 2,
+            "task_control": 0,
+            "error": 0
+          },
+          "task_control": {
+            "conversation": 0,
+            "execute": 0,
+            "clarify": 0,
+            "task_control": 9,
+            "error": 0
+          }
+        },
+        "accuracy": 0.8333333333333334,
+        "execute_precision": 0.8571428571428571,
+        "execute_recall": 0.8571428571428571,
+        "false_execution_rate": 0.0,
+        "support_accuracy": 0.9666666666666667,
+        "p50_latency_ms": 1770.5124164931476,
+        "max_latency_ms": 5530.34379100427,
+        "cost_usd": null
+      }
+    },
+    "0.85": {
+      "jev": {
+        "n": 30,
+        "errors": 0,
+        "confusion_matrix": {
+          "conversation": {
+            "conversation": 11,
+            "execute": 0,
+            "clarify": 1,
+            "task_control": 0,
+            "error": 0
+          },
+          "execute": {
+            "conversation": 0,
+            "execute": 5,
+            "clarify": 2,
+            "task_control": 0,
+            "error": 0
+          },
+          "clarify": {
+            "conversation": 0,
+            "execute": 0,
+            "clarify": 2,
+            "task_control": 0,
+            "error": 0
+          },
+          "task_control": {
+            "conversation": 0,
+            "execute": 0,
+            "clarify": 0,
+            "task_control": 9,
+            "error": 0
+          }
+        },
+        "accuracy": 0.9,
+        "execute_precision": 1.0,
+        "execute_recall": 0.7142857142857143,
+        "false_execution_rate": 0.0,
+        "support_accuracy": 0.9666666666666667,
+        "p50_latency_ms": 796.3389794458635,
+        "max_latency_ms": 2401.22954105027,
+        "cost_usd": null
+      },
+      "scaledown": {
+        "n": 30,
+        "errors": 0,
+        "confusion_matrix": {
+          "conversation": {
+            "conversation": 8,
+            "execute": 1,
+            "clarify": 0,
+            "task_control": 3,
+            "error": 0
+          },
+          "execute": {
+            "conversation": 0,
+            "execute": 6,
+            "clarify": 1,
+            "task_control": 0,
+            "error": 0
+          },
+          "clarify": {
+            "conversation": 0,
+            "execute": 0,
+            "clarify": 2,
+            "task_control": 0,
+            "error": 0
+          },
+          "task_control": {
+            "conversation": 0,
+            "execute": 0,
+            "clarify": 0,
+            "task_control": 9,
+            "error": 0
+          }
+        },
+        "accuracy": 0.8333333333333334,
+        "execute_precision": 0.8571428571428571,
+        "execute_recall": 0.8571428571428571,
+        "false_execution_rate": 0.0,
+        "support_accuracy": 0.9666666666666667,
+        "p50_latency_ms": 1770.5124164931476,
+        "max_latency_ms": 5530.34379100427,
+        "cost_usd": null
+      }
+    }
+  },
+  "locked_dataset_sha256": "f5eb3436fad71810b80b912d073afab5306bacddc135be7289749966d7d7af83"
+}

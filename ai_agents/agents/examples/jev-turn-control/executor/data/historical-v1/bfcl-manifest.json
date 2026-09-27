@@ -1,0 +1,279 @@
+{
+  "seed": 20260927,
+  "source_revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+  "license_status": "Repository Apache-2.0; separate dataset terms unconfirmed; download-only, no source wording vendored",
+  "samples": [
+    {
+      "id": "bfcl:live_relevance_0-0-0:t0",
+      "source_id": "live_relevance_0-0-0",
+      "turn": 0,
+      "category": "live_relevance",
+      "family": "bfcl-image",
+      "split": "locked-test",
+      "kind": "public_original",
+      "gold": {
+        "route": "execute",
+        "support": "supported"
+      },
+      "rationale": "Current request and supplied tools manually checked; upstream tool-call label is not four-way routing gold.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_live_relevance.json",
+      "source_sha256": "e03f9e241657a137cba48a89ee12f47bf3fcb7e4f6274263e9c699a0c974203a"
+    },
+    {
+      "id": "bfcl:live_relevance_1-1-0:t0",
+      "source_id": "live_relevance_1-1-0",
+      "turn": 0,
+      "category": "live_relevance",
+      "family": "bfcl-image",
+      "split": "locked-test",
+      "kind": "public_original",
+      "gold": {
+        "route": "execute",
+        "support": "supported"
+      },
+      "rationale": "Current request and supplied tools manually checked; upstream tool-call label is not four-way routing gold.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_live_relevance.json",
+      "source_sha256": "e03f9e241657a137cba48a89ee12f47bf3fcb7e4f6274263e9c699a0c974203a"
+    },
+    {
+      "id": "bfcl:live_relevance_2-2-0:t0",
+      "source_id": "live_relevance_2-2-0",
+      "turn": 0,
+      "category": "live_relevance",
+      "family": "bfcl-live_relevance_2-2-0",
+      "split": "locked-test",
+      "kind": "public_original",
+      "gold": {
+        "route": "execute",
+        "support": "supported"
+      },
+      "rationale": "Current request and supplied tools manually checked; upstream tool-call label is not four-way routing gold.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_live_relevance.json",
+      "source_sha256": "e03f9e241657a137cba48a89ee12f47bf3fcb7e4f6274263e9c699a0c974203a"
+    },
+    {
+      "id": "bfcl:irrelevance_0:t0",
+      "source_id": "irrelevance_0",
+      "turn": 0,
+      "category": "irrelevance",
+      "family": "bfcl-irrelevance_0",
+      "split": "locked-test",
+      "kind": "public_original",
+      "gold": {
+        "route": "conversation",
+        "support": "supported"
+      },
+      "rationale": "Current request and supplied tools manually checked; upstream tool-call label is not four-way routing gold.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_irrelevance.json",
+      "source_sha256": "2b6ed4c2e992cdcf5f1678a701851f944bef7550ee026ed1ddb89efed5be01a6"
+    },
+    {
+      "id": "bfcl:irrelevance_28:t0",
+      "source_id": "irrelevance_28",
+      "turn": 0,
+      "category": "irrelevance",
+      "family": "bfcl-irrelevance_28",
+      "split": "locked-test",
+      "kind": "public_original",
+      "gold": {
+        "route": "conversation",
+        "support": "supported"
+      },
+      "rationale": "Current request and supplied tools manually checked; upstream tool-call label is not four-way routing gold.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_irrelevance.json",
+      "source_sha256": "2b6ed4c2e992cdcf5f1678a701851f944bef7550ee026ed1ddb89efed5be01a6"
+    },
+    {
+      "id": "bfcl:irrelevance_52:t0",
+      "source_id": "irrelevance_52",
+      "turn": 0,
+      "category": "irrelevance",
+      "family": "bfcl-irrelevance_52",
+      "split": "locked-test",
+      "kind": "public_original",
+      "gold": {
+        "route": "conversation",
+        "support": "supported"
+      },
+      "rationale": "Current request and supplied tools manually checked; upstream tool-call label is not four-way routing gold.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_irrelevance.json",
+      "source_sha256": "2b6ed4c2e992cdcf5f1678a701851f944bef7550ee026ed1ddb89efed5be01a6"
+    },
+    {
+      "id": "bfcl:irrelevance_40:t0",
+      "source_id": "irrelevance_40",
+      "turn": 0,
+      "category": "irrelevance",
+      "family": "bfcl-irrelevance_40",
+      "split": "locked-test",
+      "kind": "public_original",
+      "gold": {
+        "route": "execute",
+        "support": "unsupported"
+      },
+      "rationale": "Current request and supplied tools manually checked; upstream tool-call label is not four-way routing gold.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_irrelevance.json",
+      "source_sha256": "2b6ed4c2e992cdcf5f1678a701851f944bef7550ee026ed1ddb89efed5be01a6"
+    },
+    {
+      "id": "bfcl:irrelevance_46:t0",
+      "source_id": "irrelevance_46",
+      "turn": 0,
+      "category": "irrelevance",
+      "family": "bfcl-irrelevance_46",
+      "split": "locked-test",
+      "kind": "public_original",
+      "gold": {
+        "route": "execute",
+        "support": "unsupported"
+      },
+      "rationale": "Current request and supplied tools manually checked; upstream tool-call label is not four-way routing gold.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_irrelevance.json",
+      "source_sha256": "2b6ed4c2e992cdcf5f1678a701851f944bef7550ee026ed1ddb89efed5be01a6"
+    },
+    {
+      "id": "bfcl:multi_turn_base_0:t0",
+      "source_id": "multi_turn_base_0",
+      "turn": 0,
+      "category": "multi_turn_base",
+      "family": "bfcl-multi-0",
+      "split": "locked-test",
+      "kind": "public_derived",
+      "gold": {
+        "route": "execute",
+        "support": "supported"
+      },
+      "rationale": "Current request and supplied tools manually checked; upstream tool-call label is not four-way routing gold.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_multi_turn_base.json",
+      "source_sha256": "1a21a995d06fd6f20ba55de7bced30ef953ec35e998f502ec2ecf4d66ef1c43a"
+    },
+    {
+      "id": "bfcl:multi_turn_base_1:t0",
+      "source_id": "multi_turn_base_1",
+      "turn": 0,
+      "category": "multi_turn_base",
+      "family": "bfcl-multi-1",
+      "split": "locked-test",
+      "kind": "public_derived",
+      "gold": {
+        "route": "execute",
+        "support": "supported"
+      },
+      "rationale": "Current request and supplied tools manually checked; upstream tool-call label is not four-way routing gold.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_multi_turn_base.json",
+      "source_sha256": "1a21a995d06fd6f20ba55de7bced30ef953ec35e998f502ec2ecf4d66ef1c43a"
+    },
+    {
+      "id": "bfcl:multi_turn_base_2:t0",
+      "source_id": "multi_turn_base_2",
+      "turn": 0,
+      "category": "multi_turn_base",
+      "family": "bfcl-multi-2",
+      "split": "locked-test",
+      "kind": "public_derived",
+      "gold": {
+        "route": "execute",
+        "support": "supported"
+      },
+      "rationale": "Current request and supplied tools manually checked; upstream tool-call label is not four-way routing gold.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_multi_turn_base.json",
+      "source_sha256": "1a21a995d06fd6f20ba55de7bced30ef953ec35e998f502ec2ecf4d66ef1c43a"
+    },
+    {
+      "id": "bfcl:multi_turn_base_3:t0",
+      "source_id": "multi_turn_base_3",
+      "turn": 0,
+      "category": "multi_turn_base",
+      "family": "bfcl-multi-3",
+      "split": "locked-test",
+      "kind": "public_derived",
+      "gold": {
+        "route": "execute",
+        "support": "supported"
+      },
+      "rationale": "Current request and supplied tools manually checked; upstream tool-call label is not four-way routing gold.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_multi_turn_base.json",
+      "source_sha256": "1a21a995d06fd6f20ba55de7bced30ef953ec35e998f502ec2ecf4d66ef1c43a"
+    },
+    {
+      "id": "bfcl:multi_turn_miss_param_2:t0",
+      "source_id": "multi_turn_miss_param_2",
+      "turn": 0,
+      "category": "multi_turn_miss_param",
+      "family": "bfcl-multi-2",
+      "split": "locked-test",
+      "kind": "public_derived",
+      "gold": {
+        "route": "clarify",
+        "support": "missing_parameters"
+      },
+      "rationale": "Derived tool inventory explicitly supplied; required filename/line count absent.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_multi_turn_miss_param.json",
+      "source_sha256": "f0c66dda3795f5f53e3e1c0cc8ba0246b6761c8f58bdba8317203bf451ab8838"
+    },
+    {
+      "id": "bfcl:multi_turn_miss_param_1:t3",
+      "source_id": "multi_turn_miss_param_1",
+      "turn": 3,
+      "category": "multi_turn_miss_param",
+      "family": "bfcl-multi-1",
+      "split": "locked-test",
+      "kind": "public_derived",
+      "gold": {
+        "route": "clarify",
+        "support": "missing_parameters"
+      },
+      "rationale": "Derived tool inventory explicitly supplied; required filename/line count absent.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_multi_turn_miss_param.json",
+      "source_sha256": "f0c66dda3795f5f53e3e1c0cc8ba0246b6761c8f58bdba8317203bf451ab8838"
+    },
+    {
+      "id": "bfcl:multi_turn_miss_func_0:t0",
+      "source_id": "multi_turn_miss_func_0",
+      "turn": 0,
+      "category": "multi_turn_miss_func",
+      "family": "bfcl-multi-0",
+      "split": "locked-test",
+      "kind": "public_derived",
+      "gold": {
+        "route": "execute",
+        "support": "unsupported"
+      },
+      "rationale": "Derived read-only inventory cannot fulfill requested move/list.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_multi_turn_miss_func.json",
+      "source_sha256": "87d28ce10e37d864b72de85d5732eef2a867b241d6c1c99b4ae682c9e3ea921c"
+    },
+    {
+      "id": "bfcl:multi_turn_miss_func_1:t0",
+      "source_id": "multi_turn_miss_func_1",
+      "turn": 0,
+      "category": "multi_turn_miss_func",
+      "family": "bfcl-multi-1",
+      "split": "locked-test",
+      "kind": "public_derived",
+      "gold": {
+        "route": "execute",
+        "support": "unsupported"
+      },
+      "rationale": "Derived read-only inventory cannot fulfill requested move/list.",
+      "revision": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+      "path": "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_multi_turn_miss_func.json",
+      "source_sha256": "87d28ce10e37d864b72de85d5732eef2a867b241d6c1c99b4ae682c9e3ea921c"
+    }
+  ]
+}

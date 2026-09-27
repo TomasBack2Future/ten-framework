@@ -1,0 +1,28 @@
+{
+  "reviewed_baseline": "1445d8a15e7833549391f03049fa47f62138a3b7",
+  "baseline_targeted_tests": {
+    "total": 5,
+    "failures": 4,
+    "errors": 1
+  },
+  "fixed_local_tests": {
+    "total": 23,
+    "passed": 23
+  },
+  "ubuntu_core_tests": {
+    "total": 20,
+    "passed": 20,
+    "python": "3.10",
+    "network": "none",
+    "unhandled_exceptions": 0
+  },
+  "sandbox_tasks": {
+    "total": 12,
+    "passed": 12,
+    "backend": "fake_fixture"
+  },
+  "black": "passed",
+  "pylint_score": 10.0,
+  "live_codex": "not_run_missing_authorized_credential",
+  "evaluation_boundary": "exposed-regression"
+}

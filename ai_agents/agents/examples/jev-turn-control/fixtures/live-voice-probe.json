@@ -1,0 +1,9 @@
+{
+  "groq_status": 200,
+  "groq_text": "Hello from the voice demo.",
+  "groq_ms": 1230,
+  "cartesia_pcm_bytes": 46068,
+  "cartesia_word_timestamp_messages": 4,
+  "soniox_final_text": "What is 2 plus 2?<end>",
+  "soniox_partial_seen": true
+}
