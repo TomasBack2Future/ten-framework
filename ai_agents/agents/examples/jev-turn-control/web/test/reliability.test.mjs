@@ -83,18 +83,19 @@ test("default expiry, authenticated live removal, and next-session debug retain 
   const normal = await (await post("/api/session")).json();
   assert.ok(normal.expires_at > Date.now());
   await sleep(350);
-  assert.equal((await post("/api/session")).status, 200); // Previous default session expired.
+  const next = await (await post("/api/session")).json(); // Previous default session expired.
+  assert.ok(next.id);
   assert.equal((await post("/api/debug-unlock")).status, 200);
   await sleep(350);
   assert.equal((await post("/api/session")).status, 409); // Its old timer was removed.
-  await post("/api/end");
+  await post("/api/end", { session_id: next.id });
   const debug = new DebugUnlock();
   for (let i = 0; i < 10; i++) debug.click(i);
   const unlocked = await (await post("/api/session", debug.settings())).json();
   assert.equal(unlocked.expires_at, null);
   await sleep(350);
   assert.equal((await post("/api/session")).status, 409);
-  await post("/api/end");
+  await post("/api/end", { session_id: unlocked.id });
 });
 test("concurrent requests reserve one session after body await and valid login survives shared failure bucket", async (t) => {
   const { post } = await gateway(t, { JEV_TRUST_PROXY: "1" });
@@ -103,7 +104,9 @@ test("concurrent requests reserve one session after body await and valid login s
     post("/api/session"),
   ]);
   assert.deepEqual(result.map((r) => r.status).sort(), [200, 409]);
-  await post("/api/end");
+  await post("/api/end", {
+    session_id: (await result.find((r) => r.status === 200).json()).id,
+  });
   for (let i = 0; i < 11; i++) await post("/api/login", { code: "wrong" });
   assert.equal((await post("/api/login", { code: "wrong" })).status, 429);
   assert.equal(
@@ -122,7 +125,7 @@ test("graph readiness gates media, queues early stop, and disconnect forwards st
     JEV_GRAPH_WS_URL: `ws://127.0.0.1:${upstreamPort}`,
     JEV_MODE: "live",
   });
-  await post("/api/session");
+  const created = await (await post("/api/session")).json();
   const ws = connect(),
     received = messages(ws);
   await once(ws, "open");
@@ -166,7 +169,7 @@ test("graph readiness gates media, queues early stop, and disconnect forwards st
     commands.some((m) => m.name === "jev_playback" && m.data.stopped),
   );
   assert.equal(commands.filter((m) => m.audio).length, 0);
-  await post("/api/end");
+  await post("/api/end", { session_id: created.id });
 });
 test("observation redaction retains correlation but omits credentials and text by default", () => {
   const raw = {
@@ -189,8 +192,9 @@ test("worker spawn failure clears reservation and permits retry", async (t) => {
   });
   assert.equal((await post("/api/session")).status, 200);
   await sleep(100);
-  assert.equal((await post("/api/session")).status, 200);
-  await post("/api/end");
+  const retried = await (await post("/api/session")).json();
+  assert.ok(retried.id);
+  await post("/api/end", { session_id: retried.id });
 });
 
 test("bounded observation files persist after graph exit with private permissions", async (t) => {

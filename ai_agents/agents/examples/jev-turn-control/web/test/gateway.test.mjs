@@ -63,19 +63,23 @@ test("gateway enforces auth, origin, settings, single session, snapshot and clea
     ).status,
     400,
   );
+  const created = await post(
+    "/api/session",
+    { settings: { "start.enabled": true } },
+    cookie,
+  );
+  assert.equal(created.status, 200);
+  const firstSession = await created.json();
+  assert.match(firstSession.id, /^[a-f0-9]{32}$/);
+  assert.equal((await post("/api/session", {}, cookie)).status, 409);
   assert.equal(
     (
       await post(
-        "/api/session",
-        { settings: { "start.enabled": true } },
+        "/api/end",
+        { session_id: "00000000000000000000000000000000" },
         cookie,
       )
     ).status,
-    200,
-  );
-  assert.equal((await post("/api/session", {}, cookie)).status, 409);
-  assert.equal(
-    (await post("/api/end", { session_id: "stale-session" }, cookie)).status,
     200,
   );
   assert.equal((await post("/api/session", {}, cookie)).status, 409);
@@ -106,7 +110,29 @@ test("gateway enforces auth, origin, settings, single session, snapshot and clea
     JSON.stringify({ type: "data", name: "arbitrary_command", data: {} }),
   );
   await closed;
-  assert.equal((await post("/api/end", {}, cookie)).status, 200);
-  assert.equal((await post("/api/session", {}, cookie)).status, 200);
-  await post("/api/end", {}, cookie);
+  assert.equal(
+    (await post("/api/end", { session_id: firstSession.id }, cookie)).status,
+    200,
+  );
+  const secondSession = await (await post("/api/session", {}, cookie)).json();
+  for (const invalid of [
+    {},
+    { session_id: "" },
+    { session_id: 7 },
+    { session_id: "not-an-id" },
+  ])
+    assert.equal((await post("/api/end", invalid, cookie)).status, 400);
+  // S1 cleanup succeeded but its response was lost. Both retry and old pagehide
+  // use S1's explicit ID after another tab with the same cookie creates S2.
+  for (const oldPath of ["cleanup retry", "pagehide"])
+    assert.equal(
+      (await post("/api/end", { session_id: firstSession.id }, cookie)).status,
+      200,
+      oldPath,
+    );
+  assert.equal((await post("/api/session", {}, cookie)).status, 409);
+  assert.equal(
+    (await post("/api/end", { session_id: secondSession.id }, cookie)).status,
+    200,
+  );
 });

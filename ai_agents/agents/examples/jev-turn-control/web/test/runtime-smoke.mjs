@@ -14,7 +14,7 @@ const child = spawn(process.execPath, ["web/server.mjs"], {
   },
   stdio: ["ignore", "pipe", "inherit"],
 });
-let ws;
+let ws, session;
 try {
   await once(child.stdout, "data");
   const start = await fetch("http://localhost:3309/api/session", {
@@ -26,6 +26,7 @@ try {
     body: "{}",
   });
   assert.equal(start.status, 200);
+  session = await start.json();
   ws = new WebSocket("ws://localhost:3309/ws", {
     headers: { Origin: "http://localhost:3309" },
   });
@@ -103,13 +104,14 @@ try {
   );
 } finally {
   ws?.close();
-  await fetch("http://localhost:3309/api/end", {
-    method: "POST",
-    headers: {
-      Origin: "http://localhost:3309",
-      "Content-Type": "application/json",
-    },
-    body: "{}",
-  }).catch(() => {});
+  if (session)
+    await fetch("http://localhost:3309/api/end", {
+      method: "POST",
+      headers: {
+        Origin: "http://localhost:3309",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ session_id: session.id }),
+    }).catch(() => {});
   child.kill("SIGTERM");
 }

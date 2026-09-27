@@ -34,7 +34,18 @@ for (const failure of ["unlock", "busy", "initialize", "cleanup"]) {
       closed = 0;
     const requests = [];
     replace("document", { getElementById: get });
-    replace("window", { addEventListener() {} });
+    const listeners = {};
+    replace("window", {
+      addEventListener(name, fn) {
+        listeners[name] = fn;
+      },
+    });
+    const beacons = [];
+    replace("navigator", {
+      sendBeacon(path, body) {
+        beacons.push({ path, body });
+      },
+    });
     replace("location", { protocol: "https:", host: "demo.test" });
     replace("setInterval", () => 123);
     replace("clearInterval", () => {});
@@ -75,7 +86,7 @@ for (const failure of ["unlock", "busy", "initialize", "cleanup"]) {
             ? { error: "busy or cleanup failed" }
             : path === "/api/config"
               ? { mode: "mock", revision: "test", authenticated: true }
-              : { session_id: "created-by-this-attempt" },
+              : { id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", expires_at: null },
       };
     });
     await import(`../public/app.js?failure=${failure}`);
@@ -92,7 +103,7 @@ for (const failure of ["unlock", "busy", "initialize", "cleanup"]) {
     );
     if (cleanup.length)
       assert.deepEqual(cleanup[0].body, {
-        session_id: "created-by-this-attempt",
+        session_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       });
     if (failure === "unlock")
       assert.equal(
@@ -107,5 +118,15 @@ for (const failure of ["unlock", "busy", "initialize", "cleanup"]) {
     assert.equal(get("voice-prompt").disabled, true);
     if (failure === "cleanup")
       assert.equal(requests[retryStart].path, "/api/end");
+    listeners.pagehide();
+    assert.deepEqual(JSON.parse(await beacons[0].body.text()), {
+      session_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    });
+    await get("end").onclick();
+    assert.deepEqual(requests.at(-1).body, {
+      session_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    });
+    listeners.pagehide();
+    assert.equal(beacons.length, 1);
   });
 }

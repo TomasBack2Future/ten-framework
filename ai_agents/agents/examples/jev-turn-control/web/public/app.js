@@ -232,7 +232,7 @@ $("connect").onclick = async () => {
     $("error").textContent = "";
     // Retry a previously failed cleanup before creating another graph.
     if (session) {
-      await api("/api/end", { session_id: session.session_id });
+      await api("/api/end", { session_id: session.id });
       session = null;
     }
     await player.unlock();
@@ -269,7 +269,7 @@ $("connect").onclick = async () => {
     let cleanupError;
     if (session) {
       try {
-        await api("/api/end", { session_id: session.session_id });
+        await api("/api/end", { session_id: session.id });
         session = null;
       } catch (error) {
         cleanupError = error;
@@ -296,7 +296,15 @@ $("end").onclick = async () => {
   recording = false;
   player.stop();
   socket?.close();
-  await api("/api/end", {}).catch(fail);
+  if (session) {
+    try {
+      await api("/api/end", { session_id: session.id });
+    } catch (error) {
+      fail(error);
+      $("connect").disabled = false;
+      return;
+    }
+  }
   session = null;
   for (const id of settingIds) $(id).disabled = false;
   $("connect").disabled = false;
@@ -405,8 +413,11 @@ window.addEventListener("pagehide", () => {
   socket?.close();
   recorder.stop();
   player.destroy();
-  navigator.sendBeacon(
-    "/api/end",
-    new Blob(["{}"], { type: "application/json" }),
-  );
+  if (session)
+    navigator.sendBeacon(
+      "/api/end",
+      new Blob([JSON.stringify({ session_id: session.id })], {
+        type: "application/json",
+      }),
+    );
 });
