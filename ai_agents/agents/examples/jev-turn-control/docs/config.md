@@ -1,18 +1,21 @@
 # Turn control session configuration (v1)
 
 Server loads the `turn_control` node property once per session. No hot config
-updates: restart the session to change settings. The UI may expose only
-`turn.enabled`, `start.enabled`, `stop.enabled`, `backchannel.enabled`.
+updates: restart the session to change settings. The UI exposes allowlisted
+provider/profile choices, feature switches and bounded prompt/memory options.
+Executor availability is additionally gated by the operator configuration.
 `turn.enabled=false` bypasses semantic classification and uses the bounded
 silence timer. `start.enabled=false` holds indefinitely by explicit choice.
 Stop means the USER reclaims the floor; assistant proactive interruption is
 not implemented and has no `barge_in` switch.
 
 Canonical defaults and range validation live in extension `config.py`.
-Unknown keys/types fail startup. Provider: `mock` or `jev`, model `jev-latest`,
-endpoint `https://api.typesafe.ai/v1/systemone`, secret_env `JEV_API_KEY`.
-Only the server resolves that environment variable; never return node properties
-or secrets to a browser. ScaleDown is an offline compression comparison only.
+Unknown keys/types fail startup. Live providers are `jev` (default), `sd` and
+`sd_jev`; `mock` is reserved for synthetic transport. The tuned candidate pins
+Jev to `jev-1.13.0`; baseline preserves `jev-latest`. Only the server resolves
+`JEV_API_KEY` / `SCALEDOWN_API_KEY`; never return credentials to a browser.
+See [decision modes](../DECISION_MODES.md) for full instructions, criteria,
+thresholds, baseline comparison and provider-specific endpoints.
 No provider retries in the latency-sensitive path; timeout 800 ms, failure_policy
 `bounded_wait` (clarify at the maximum wait) or `hold` (explicit fail closed).
 Per-judgment `start.prompt`, `stop.prompt`, `backchannel.prompt` override only
@@ -42,17 +45,21 @@ the accepted timer label and its remaining delay; resume restores it only if its
 input revision still matches. New input while paused gets a fresh decision.
 Final alone grants no start permission. Agent EOS is ignored.
 
-Start threshold is .6. For a final segment with a below-threshold winning label,
+The baseline start threshold is .6. For a final segment with a below-threshold winning label,
 answer+clarify probability can satisfy the parent "ready to respond" category.
 The larger child probability selects answer versus clarify; a tie clarifies.
 This does not override an explicit_wait/ignore label. Observations retain the
 provider's original label/score and record effective_label/effective_score when
-applying a start policy. This is a timing policy, not proof of semantic accuracy.
+applying a start policy. Tuned Jev instead uses top-label scoring at .47;
+tuned SD / SD → Jev use combined answer+clarify only for an already-selected
+answer or clarify, at .95 / .54 respectively. This is a timing policy, not
+proof of semantic accuracy.
 
 Backchannel defaults off. Allowed phrases `["Mm-hmm.", "I see."]`, cooldown
-5000 ms, result validity 600 ms, threshold .8. Only continuation allows it;
+5000 ms, result validity 600 ms, baseline threshold .8 (tuned Jev .71,
+SD .62, SD → Jev .74). Only continuation allows it;
 answer, clarify, wait and ignore veto it. It never starts while a main response
-or stop acknowledgment is active. Stop threshold .65. A backchannel older than
+or stop acknowledgment is active. Stop threshold .65 (tuned SD .49). A backchannel older than
 600 ms is intentionally dropped even if the provider succeeds within its 800 ms
 timeout: a late acknowledgment should not interrupt a newly developing thought.
 

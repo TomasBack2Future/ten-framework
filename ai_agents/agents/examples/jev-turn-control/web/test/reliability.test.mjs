@@ -22,6 +22,7 @@ async function gateway(t, env = {}) {
       JEV_ACCESS_CODE: "test-code",
       JEV_GRAPH_COMMAND: "",
       JEV_MODE: "mock",
+      JEV_API_KEY: "test-only-key",
       ...env,
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -226,4 +227,40 @@ test("bounded observation files persist after graph exit with private permission
   assert.match(text, /test-revision/);
   assert.doesNotMatch(text, /private transcript|credential/);
   assert.equal((await stat(`${dir}/${files[0]}`)).mode & 0o777, 0o600);
+});
+
+test("decision mode and profile validation, defaults and credential availability", async (t) => {
+  const { post } = await gateway(t);
+  for (const settings of [
+    { "provider.name": "other" },
+    { "provider.name": true },
+    { "provider.profile": "other" },
+    { "provider.sd_endpoint": "https://untrusted" },
+  ])
+    assert.equal((await post("/api/session", { settings })).status, 400);
+  for (const name of [undefined, "jev", "sd", "sd_jev"]) {
+    const settings = name
+      ? { "provider.name": name, "provider.profile": "baseline" }
+      : {};
+    const created = await post("/api/session", { settings });
+    assert.equal(created.status, 200);
+    const session = await created.json();
+    assert.equal(session.decision_mode, name || "jev");
+    assert.equal(session.decision_profile, name ? "baseline" : "tuned");
+    assert.equal(
+      (await post("/api/end", { session_id: session.id })).status,
+      200,
+    );
+  }
+  const live = await gateway(t, {
+    JEV_MODE: "live",
+    JEV_API_KEY: "",
+    SCALEDOWN_API_KEY: "",
+  });
+  for (const name of ["jev", "sd", "sd_jev"])
+    assert.equal(
+      (await live.post("/api/session", { settings: { "provider.name": name } }))
+        .status,
+      503,
+    );
 });

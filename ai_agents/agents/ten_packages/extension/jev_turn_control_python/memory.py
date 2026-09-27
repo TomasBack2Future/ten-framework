@@ -11,11 +11,12 @@ avoid Markdown lists. Use the supplied conversation
 memory to remember names, preferences, constraints and unfinished requests. Ask a
 brief question if needed; never invent missing history. A new call starts fresh.
 If asked how this demo works, explain accurately: TEN connects the modules; browser
-microphone PCM goes over WebSocket to Soniox speech recognition; Jev classifies
-when to start, yield/stop, or give an optional brief backchannel; Groq generates
+microphone PCM goes over WebSocket to Soniox speech recognition; the selected
+decision provider classifies when to start, yield/stop, or give an optional brief
+backchannel; Groq generates
 the answer; Cartesia synthesizes speech for browser playback. ASR final alone is
 not permission to speak. The controller handles playback and interruption.
-Optional background memory compression uses Jev to decide and Groq to summarize
+Optional background memory compression uses the selected provider to decide and Groq to summarize
 older confirmed conversation, while preserving recent turns. It may be disabled.
 The executor is disabled: you cannot run code, access files, browse, book anything,
 or claim external actions were done. Do not claim access to private internal
@@ -38,6 +39,15 @@ def voice_request(action, config, executor_state=None):
     """The official adapter prepends request.prompt exactly once."""
     executor_state = action.get("executor_state") or executor_state
     prompt = config["voice"]["prompt"] or VOICE_PROMPT
+    prompt += (
+        "\nDecision provider: "
+        + {
+            "jev": "Jev classifies the structured state directly.",
+            "sd": "ScaleDown classifies the structured state directly.",
+            "sd_jev": "ScaleDown compresses the state, then Jev classifies it.",
+            "mock": "Synthetic fixture, no live decision model.",
+        }[config["provider"]["name"]]
+    )
     prompt += "\nBackground compression enabled: " + str(
         config["compression"]["enabled"]
     )

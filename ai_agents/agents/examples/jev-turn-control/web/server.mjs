@@ -303,6 +303,8 @@ const server = http.createServer(async (req, res) => {
           return json(res, 400, { error: "Invalid debug setting" });
         const settings = request.settings || {};
         const keys = [
+          "provider.name",
+          "provider.profile",
           "voice.prompt",
           "executor.enabled",
           "compression.enabled",
@@ -319,6 +321,10 @@ const server = http.createServer(async (req, res) => {
           "stop.prompt",
           "backchannel.prompt",
         ];
+        const choices = {
+          "provider.name": ["jev", "sd", "sd_jev"],
+          "provider.profile": ["baseline", "tuned"],
+        };
         const limits = {
           "compression.trigger_chars": [1000, 24000],
           "compression.keep_turns": [1, 12],
@@ -328,14 +334,28 @@ const server = http.createServer(async (req, res) => {
           if (
             !keys.includes(k) ||
             (k === "executor.enabled" && v && !executorAvailable) ||
-            (k.endsWith(".enabled")
-              ? typeof v !== "boolean"
-              : limits[k]
-                ? !Number.isInteger(v) || v < limits[k][0] || v > limits[k][1]
-                : typeof v !== "string" || v.length > 2000)
+            (choices[k]
+              ? !choices[k].includes(v)
+              : k.endsWith(".enabled")
+                ? typeof v !== "boolean"
+                : limits[k]
+                  ? !Number.isInteger(v) || v < limits[k][0] || v > limits[k][1]
+                  : typeof v !== "string" || v.length > 2000)
           )
             return json(res, 400, { error: "Invalid session setting" });
         }
+        const decisionMode = settings["provider.name"] || "jev";
+        const decisionProfile = settings["provider.profile"] || "tuned";
+        const required =
+          decisionMode === "jev"
+            ? ["JEV_API_KEY"]
+            : decisionMode === "sd"
+              ? ["SCALEDOWN_API_KEY"]
+              : ["JEV_API_KEY", "SCALEDOWN_API_KEY"];
+        if (mode === "live" && required.some((key) => !process.env[key]))
+          return json(res, 503, {
+            error: "Selected decision mode is not configured on this server",
+          });
         const s = {
           id: randomBytes(16).toString("hex"),
           owner: cookie(req),
@@ -352,6 +372,8 @@ const server = http.createServer(async (req, res) => {
           type: "session.started",
           mode,
           unlimited: !!request.unlimited,
+          decision_mode: decisionMode,
+          decision_profile: decisionProfile,
         });
         session = s;
         if (!request.unlimited)
@@ -396,7 +418,12 @@ const server = http.createServer(async (req, res) => {
             return json(res, 503, { error: "Mock fixtures not installed" });
           }
         }
-        return json(res, 200, { id: s.id, expires_at: s.expires_at });
+        return json(res, 200, {
+          id: s.id,
+          expires_at: s.expires_at,
+          decision_mode: decisionMode,
+          decision_profile: decisionProfile,
+        });
       }
       return json(res, 404, { error: "Unknown endpoint" });
     }

@@ -115,6 +115,7 @@ class TurnEngine:
             "context_revision": self.context_revision,
             "context_capacity_reached": self.capacity_reached,
             "mode": self.config["provider"]["name"],
+            "decision_profile": self.config["provider"]["profile"],
             "playback_precision": "browser_cursor_estimate",
         }
         return self.emit("state.snapshot", state, self.active)
@@ -329,7 +330,8 @@ class TurnEngine:
             "clarify", 0
         )
         if (
-            self.final
+            self.config["start"]["score_mode"] == "legacy_reply"
+            and self.final
             and label not in ("explicit_wait", "ignore")
             and score < self.config["start"]["threshold"]
             and reply_score >= self.config["start"]["threshold"]
@@ -340,6 +342,10 @@ class TurnEngine:
                 > probabilities.get("clarify", 0)
                 else "clarify"
             )
+            score = reply_score
+        if self.config["start"][
+            "score_mode"
+        ] == "answer_plus_clarify" and label in ("answer", "clarify"):
             score = reply_score
         if label in (
             "answer",

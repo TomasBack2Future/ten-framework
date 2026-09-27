@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from copy import deepcopy
 
+from .profiles import profile_for, validate_criteria
+
 DEFAULTS = {
     "executor": {"enabled": False},
     "voice": {"prompt": ""},
@@ -36,7 +38,11 @@ DEFAULTS = {
         "valid_ms": 600,
     },
     "provider": {
-        "name": "mock",
+        "name": "jev",
+        "profile": "tuned",
+        "sd_endpoint": "https://api.scaledown.xyz/v1/scaledown",
+        "sd_compress_endpoint": "https://api.scaledown.xyz/compress/raw/",
+        "sd_secret_env": "SCALEDOWN_API_KEY",
         "model": "jev-latest",
         "endpoint": "https://api.typesafe.ai/v1/systemone",
         "secret_env": "JEV_API_KEY",
@@ -70,6 +76,19 @@ DEFAULTS = {
 }
 
 
+# Criteria are separately overridable; their labels remain a fixed contract.
+for _kind in ("start", "stop", "backchannel", "compression"):
+    DEFAULTS[_kind]["criteria"] = {}
+DEFAULTS["start"]["score_mode"] = "legacy_reply"
+DEFAULTS["route"] = {
+    "prompt": "",
+    "criteria": {},
+    "threshold": 0.75,
+    "task_control_threshold": 0.75,
+}
+DEFAULTS["support"] = {"prompt": "", "criteria": {}, "threshold": 0.75}
+
+
 @dataclass
 class Config:
     """Reject unknown options, incompatible limits and unsafe endpoints."""
@@ -79,6 +98,31 @@ class Config:
     @classmethod
     def load(cls, raw=None):
         values = deepcopy(DEFAULTS)
+        raw = raw or {}
+        provider = raw.get("provider", {})
+        if not isinstance(provider, dict):
+            raise ValueError("invalid provider configuration")
+        name = provider.get("name", values["provider"]["name"])
+        profile = provider.get("profile", values["provider"]["profile"])
+        if profile not in ("baseline", "tuned"):
+            raise ValueError("unknown decision profile")
+        if name not in ("jev", "sd", "sd_jev", "mock"):
+            raise ValueError("unknown decision mode")
+        if profile == "tuned":
+            values["provider"]["model"] = "jev-1.13.0"
+            for kind, spec in profile_for(name).items():
+                values[kind].update(
+                    prompt=spec["instructions"],
+                    criteria=deepcopy(spec["criteria"]),
+                    threshold=spec["threshold"],
+                )
+                if kind == "start":
+                    values[kind]["score_mode"] = spec["score_mode"]
+                if kind == "route":
+                    values[kind]["threshold"] = spec["execute_threshold"]
+                    values[kind]["task_control_threshold"] = spec[
+                        "task_control_threshold"
+                    ]
         for section, options in (raw or {}).items():
             if section not in values or not isinstance(options, dict):
                 raise ValueError("unknown configuration section")
@@ -100,7 +144,10 @@ class Config:
                     valid = isinstance(value, type(default))
                 if not valid:
                     raise ValueError(f"invalid type: {section}.{key}")
-                values[section][key] = value
+                # Empty UI prompt overrides mean use the selected profile.
+                if key == "prompt" and not value:
+                    continue
+                values[section][key] = deepcopy(value)
         cfg = cls(values)
         cfg.validate()
         return cfg
@@ -115,8 +162,10 @@ class Config:
                     raise ValueError(f"out of range: {section}.{key}")
                 if key.endswith("prompt") and len(value) > 2000:
                     raise ValueError("prompt exceeds 2000 characters")
-                if key == "threshold" and not 0 <= value <= 1:
+                if key.endswith("threshold") and not 0 <= value <= 1:
                     raise ValueError("threshold outside [0,1]")
+        if self["support"]["threshold"] <= 0:
+            raise ValueError("support threshold must be positive")
         sched = self["scheduling"]
         if sched["max_inflight"] != 1:
             raise ValueError(
@@ -131,17 +180,34 @@ class Config:
             raise ValueError("trigger interval exceeds max wait")
         if not 50 <= self["provider"]["timeout_ms"] <= 10000:
             raise ValueError("provider timeout outside [50,10000]")
-        if self["provider"]["name"] not in ("mock", "jev"):
-            raise ValueError(
-                "provider must be mock or jev; ScaleDown is offline only"
-            )
+        if self["provider"]["name"] not in ("mock", "jev", "sd", "sd_jev"):
+            raise ValueError("invalid decision mode")
+        if self["start"]["score_mode"] not in (
+            "top",
+            "answer_plus_clarify",
+            "legacy_reply",
+        ):
+            raise ValueError("invalid start score mode")
+        for kind in (
+            "start",
+            "stop",
+            "backchannel",
+            "compression",
+            "route",
+            "support",
+        ):
+            validate_criteria(kind, self[kind]["criteria"])
         if self["provider"]["failure_policy"] not in ("bounded_wait", "hold"):
             raise ValueError("invalid failure policy")
-        if not self["provider"]["endpoint"].startswith("https://"):
-            raise ValueError("provider requires HTTPS")
-        name = self["provider"]["secret_env"]
-        if not name or not name.replace("_", "").isalnum():
-            raise ValueError("secret_env must be an environment variable name")
+        for endpoint in ("endpoint", "sd_endpoint", "sd_compress_endpoint"):
+            if not self["provider"][endpoint].startswith("https://"):
+                raise ValueError("provider requires HTTPS")
+        for option in ("secret_env", "sd_secret_env"):
+            name = self["provider"][option]
+            if not name or not name.replace("_", "").isalnum():
+                raise ValueError(
+                    "secret_env must be an environment variable name"
+                )
         if not 16 <= self["observation"]["buffer_limit"] <= 4096:
             raise ValueError("buffer_limit outside [16,4096]")
         if not 1 <= self["playback"]["context_responses"] <= 64:

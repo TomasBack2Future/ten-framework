@@ -4,7 +4,8 @@ A public TEN 0.11.73 graph with separate start/stop/backchannel judgments,
 revision fences, bounded scheduling, and played-context tracking. Jev is the
 main decision provider. Soniox supplies streaming ASR, Groq supplies the main
 answer through the public OpenAI-compatible extension, and Cartesia supplies
-PCM16 audio and word timestamps. ScaleDown remains an offline comparison.
+PCM16 audio and word timestamps. Session settings also support ScaleDown direct
+classification and ScaleDown compression → Jev. Jev remains the default.
 
 The event stream exposes inputs, classification probabilities, timers and
 applied actions, never model reasoning. Backchannel defaults off. ASR final
@@ -80,3 +81,10 @@ a person heard. A 500ms missing-stop-ack timeout is explicitly unconfirmed.
 All added business logic was written against public TEN APIs; no commercial
 interceptor or conversational-agent implementation was copied. Repository and
 copied-template licenses remain applicable.
+
+## Decision modes
+
+Session settings support Jev (default), SD direct classification and SD → Jev.
+The tuned candidate includes instructions, criteria and per-provider thresholds;
+the original baseline remains selectable. See [DECISION_MODES.md](DECISION_MODES.md)
+for configuration, measured latency, executor boundaries and evaluation limits.

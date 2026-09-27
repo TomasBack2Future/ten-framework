@@ -16,6 +16,8 @@ def graph_for(mode, overrides):
         "observation": {"include_text": True},
     }
     allowed = {
+        "provider.name",
+        "provider.profile",
         "voice.prompt",
         "executor.enabled",
         "compression.enabled",
@@ -35,6 +37,10 @@ def graph_for(mode, overrides):
     for key, value in overrides.items():
         if key not in allowed:
             raise ValueError("unsupported session override")
+        if key == "provider.name" and value not in ("jev", "sd", "sd_jev"):
+            raise ValueError("invalid decision mode")
+        if key == "provider.profile" and value not in ("baseline", "tuned"):
+            raise ValueError("invalid decision profile")
         if key.endswith(".enabled") and not isinstance(value, bool):
             raise ValueError("boolean required")
         if key.endswith("prompt") and (
@@ -59,6 +65,9 @@ def graph_for(mode, overrides):
             raise ValueError("executor unavailable")
         section, option = key.split(".")
         config.setdefault(section, {})[option] = value
+    # Mock transport must never call paid providers, regardless of UI selection.
+    if mode == "mock":
+        config["provider"]["name"] = "mock"
     graph = {
         "nodes": [
             {
@@ -224,16 +233,13 @@ def main():
         )
         return
     if args.mode == "live":
-        missing = [
-            k
-            for k in (
-                "JEV_API_KEY",
-                "SONIOX_API_KEY",
-                "GROQ_API_KEY",
-                "CARTESIA_API_KEY",
-            )
-            if not os.environ.get(k)
-        ]
+        decision_mode = overrides.get("provider.name", "jev")
+        required = ["SONIOX_API_KEY", "GROQ_API_KEY", "CARTESIA_API_KEY"]
+        if decision_mode in ("jev", "sd_jev"):
+            required.append("JEV_API_KEY")
+        if decision_mode in ("sd", "sd_jev"):
+            required.append("SCALEDOWN_API_KEY")
+        missing = [k for k in required if not os.environ.get(k)]
         if missing:
             raise SystemExit(
                 "Missing server credentials: " + ", ".join(missing)

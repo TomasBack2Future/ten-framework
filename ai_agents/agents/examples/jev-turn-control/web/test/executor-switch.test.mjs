@@ -20,6 +20,8 @@ for (const enabled of ["false", "true"]) {
         JEV_PUBLIC_ORIGIN: origin,
         JEV_ACCESS_CODE: "test-only-secret",
         JEV_MODE: "live",
+        JEV_API_KEY: "test-only-jev",
+        SCALEDOWN_API_KEY: "test-only-sd",
         JEV_CODEX_ENABLED: enabled,
         JEV_GRAPH_COMMAND: "",
       },
@@ -51,16 +53,28 @@ for (const enabled of ["false", "true"]) {
       ).status,
       400,
     );
-    // With the gate enabled, validation passes but missing voice graph fails (503).
-    assert.equal(
-      (
-        await post(
+    // All provider/profile combinations retain the separate operator gate.
+    for (const name of ["jev", "sd", "sd_jev"]) {
+      for (const profile of ["baseline", "tuned"]) {
+        const response = await post(
           "/api/session",
-          { settings: { "executor.enabled": true } },
+          {
+            settings: {
+              "executor.enabled": true,
+              "provider.name": name,
+              "provider.profile": profile,
+            },
+          },
           cookie,
-        )
-      ).status,
-      enabled === "true" ? 503 : 400,
-    );
+        );
+        assert.equal(response.status, enabled === "true" ? 503 : 400);
+        assert.equal(
+          (await response.json()).error,
+          enabled === "true"
+            ? "Live graph not configured"
+            : "Invalid session setting",
+        );
+      }
+    }
   });
 }
