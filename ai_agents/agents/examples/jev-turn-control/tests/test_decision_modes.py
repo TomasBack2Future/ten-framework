@@ -260,7 +260,7 @@ def test_selected_start_gate_and_subcategory(mode, threshold):
     no = apply("clarify", {"clarify": threshold - 0.01, "answer": 0})
     assert not no.timer
     split = apply("clarify", {"clarify": threshold - 0.1, "answer": 0.15})
-    assert bool(split.timer) == (mode != "jev")
+    assert split.timer is not None
     continuation = apply(
         "continuation", {"continuation": 0.35, "answer": 0.32, "clarify": 0.33}
     )

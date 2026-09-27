@@ -24,8 +24,10 @@ adapter tests additionally verify exactly-once TTS submission and cancellation.
 
 ## Prompt selection is separate from bugs
 
-Only Jev's tuned start instructions/criteria change. Threshold .47, top score,
-stop rules, timer durations, and SD runtime profile remain unchanged. The bounded
+Only Jev's tuned start instructions/criteria change. Threshold .47,
+stop rules, timer durations, and SD runtime profile remain unchanged.
+The final Jev gate uses answer+clarify probability only when the chosen label is
+answer or clarify. It never overrides continuation, explicit_wait, or ignore. The bounded
 prompt limit increases from 2000 to 4096 to accommodate the evaluated 2222-char
 prompt verbatim. No browser protocol or default capability switches change.
 
@@ -62,3 +64,33 @@ not khipaa latency or speech latency. No provider credentials are included.
 See manifest.json and results.jsonl for all acceptance inputs and raw outputs.
 The incident evidence and intermediate candidate results remain in the local
 investigation directory rather than publishing the user's session contents.
+
+## Stability follow-up and final gate acceptance
+
+Additional identical-prompt repetition found one borderline incident answer at
+.43 (answer) + .12 (clarify). In that follow-up A and B were byte-identical D
+questions because the source default had already been updated: these are six
+repetitions per state/provider, NOT an old/new A/B comparison. Jev top .47 missed
+one of the six repetitions for that case. The reply-mass gate recovers it.
+
+The final selected policy is D + chosen-label-in-{answer,clarify} +
+(answer+clarify >= .47). Raw threshold lowering was not selected. The original
+24-case acceptance above became an additional gate-development check; do not
+claim it is untouched holdout for the gate selection.
+
+With prompt and gate fixed, final-acceptance/ froze 28 NEW authored cases, 14
+positive and 14 negative. Three repeats per case, both questions and providers:
+336 HTTP 200 results. A uses old prompt/top .47, B uses D/reply-mass .47.
+
+| Provider / policy | Missed replies / 42 | False starts / 42 |
+|---|---:|---:|
+| Jev old | 3 | 3 |
+| Jev selected | 0 | 0 |
+| ScaleDown old (controlled .47) | 0 | 12 |
+| ScaleDown selected (controlled .47) | 0 | 0 |
+
+These are repeated observations of 28 cases, not 84 independent cases per
+provider/policy. The final set was not used to alter the selected policy.
+SD remains a same-input controlled comparison, not a change to its runtime
+profile. This is limited offline semantic acceptance; live acoustic testing
+must use the merged release and is not asserted here.

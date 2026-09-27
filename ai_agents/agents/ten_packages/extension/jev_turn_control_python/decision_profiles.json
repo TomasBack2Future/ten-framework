@@ -11,7 +11,7 @@
         "ignore": "Only acknowledgment to a statement, filler, or background speech requiring no reply. Do not ignore a short answer to the last assistant question or acceptance of its offer to explain/continue."
       },
       "threshold": 0.47,
-      "score_mode": "top"
+      "score_mode": "answer_plus_clarify"
     },
     "stop": {
       "type": "choice",
