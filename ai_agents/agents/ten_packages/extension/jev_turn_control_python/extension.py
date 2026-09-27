@@ -6,6 +6,7 @@ import math
 import os
 import struct
 import time
+import uuid
 
 import aiohttp
 
@@ -65,10 +66,11 @@ class JevTurnControlExtension(AsyncExtension):
         if error:
             raise ValueError("cannot read turn configuration")
         self.started = time.monotonic()
-        self.evidence = Evidence(os.environ.get("JEV_SESSION_ID", "demo"))
+        session_id = os.environ.get("JEV_SESSION_ID") or uuid.uuid4().hex
+        self.evidence = Evidence(session_id)
         self.engine = TurnEngine(
             Config.load(json.loads(raw or "{}")),
-            os.environ.get("JEV_SESSION_ID", "demo"),
+            session_id,
             event_sink=self.record,
         )
         self.record(
