@@ -48,7 +48,11 @@ class ExecutorClient:
 
     def fail(self, code):
         self.failed = True
-        self.state = {"status": "error", "code": code}
+        self.state = {
+            "task_id": "call-executor",
+            "status": "error",
+            "code": code,
+        }
         self.emit("task.error", self.state)
 
     async def request(self, method, path, payload=None):
@@ -74,6 +78,9 @@ class ExecutorClient:
             async with aiohttp.ClientSession(
                 headers={"Authorization": "Bearer " + self.token},
                 timeout=aiohttp.ClientTimeout(total=3),
+                json_serialize=lambda value: json.dumps(
+                    value, ensure_ascii=False
+                ),
             ) as client:
                 self.client = client
                 created = await self.request("POST", "/sessions")

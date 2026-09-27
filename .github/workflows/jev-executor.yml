@@ -1,0 +1,30 @@
+name: Jev optional executor
+on:
+  pull_request:
+    paths:
+      - 'ai_agents/agents/examples/jev-turn-control/executor/**'
+      - '.github/workflows/jev-executor.yml'
+permissions:
+  contents: read
+jobs:
+  executor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Build isolated image
+        run: docker build -t jev-executor:test ai_agents/agents/examples/jev-turn-control/executor
+      - name: Run offline SDK and lifecycle tests
+        run: >-
+          docker run --rm --network none --read-only
+          --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777
+          --tmpfs /work:rw,nosuid,nodev,size=256m,uid=10001,gid=10001
+          jev-executor:test python -m unittest discover -s /opt/jev/executor/tests -v
+      - name: Verify isolated runtime and disabled service
+        run: >-
+          docker run --rm --network none --read-only
+          --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777
+          --tmpfs /work:rw,nosuid,nodev,size=256m,uid=10001,gid=10001
+          jev-executor:test python -m executor.smoke_service

@@ -92,6 +92,7 @@ class JevTurnControlExtension(AsyncExtension):
         if (
             state.get("status") == "completed"
             and state.get("notify_user")
+            and self.engine.config["start"]["enabled"]
             and state.get("current")
             and state.get("version", 0) > self.executor_notified
             and state.get("input_revision") == self.engine.revision

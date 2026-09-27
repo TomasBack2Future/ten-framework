@@ -167,6 +167,15 @@ def test_voice_mailbox_to_http_session_handles_followup_without_blocking():
                         assert any(
                             kind == "task.completed" for kind, _ in events
                         )
+                        client.submit(3, "😀" * 16000, ["😀" * 16000])
+                        await until(lambda: len(call.backend.inputs) == 3)
+                        assert len(call.backend.inputs[-1]["text"]) == 16000
+                        assert not client.failed
+                        call.backend.gates.put_nowait(result)
+                        await until(
+                            lambda: client.state.get("status") == "completed"
+                            and client.state.get("input_revision") == 3
+                        )
                     finally:
                         await client.close()
                     assert not manager.calls
@@ -199,6 +208,12 @@ def test_result_notification_waits_for_voice_and_input_to_settle():
         extension.engine.active is None
     )  # Pending user response takes priority.
     extension.engine.pending = False
+    extension.engine.config = Config.load({"start": {"enabled": False}})
+    extension.notify_executor()
+    assert (
+        extension.engine.active is None
+    )  # The speech-start switch also gates notifications.
+    extension.engine.config = Config.load()
     extension.engine.start("answer")
     foreground = extension.engine.active
     extension.notify_executor()

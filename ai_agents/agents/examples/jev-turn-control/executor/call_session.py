@@ -193,7 +193,7 @@ class CallSessions:
         return call.snapshot()
 
     def submit(self, sid, item):
-        """Reject gaps/conflicting retries; acknowledge without awaiting a model."""
+        """Reject stale/conflicting retries; acknowledge without awaiting a model."""
         call = self.calls[sid]
         if call.closing or call.failed:
             raise ValueError("session unavailable")
