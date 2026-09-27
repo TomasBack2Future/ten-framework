@@ -1,0 +1,19 @@
+{
+  "name": "jev-demo-rtc-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check server.mjs && node --check public/rtc.js && node --check public/app.js"
+  },
+  "dependencies": {
+    "ws": "8.22.0",
+    "agora-rtc-sdk-ng": "4.21.0",
+    "agora-token": "2.0.3"
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
+}

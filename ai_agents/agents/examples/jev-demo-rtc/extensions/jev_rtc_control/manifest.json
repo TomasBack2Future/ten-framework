@@ -1,0 +1,153 @@
+{
+  "type": "extension",
+  "name": "jev_rtc_control",
+  "version": "0.1.0",
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "=0.11.73"
+    }
+  ],
+  "api": {
+    "cmd_in": [
+      {
+        "name": "jev_ping",
+        "property": {
+          "properties": {
+            "nonce": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "nonce"
+          ]
+        },
+        "result": {
+          "property": {
+            "properties": {
+              "nonce": {
+                "type": "string"
+              },
+              "stage": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "nonce",
+              "stage"
+            ]
+          }
+        }
+      },
+      {
+        "name": "jev_inspect",
+        "result": {
+          "property": {
+            "properties": {
+              "snapshot": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "jev_input",
+        "property": {
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "final": {
+              "type": "bool"
+            },
+            "segment_id": {
+              "type": "string"
+            }
+          }
+        },
+        "result": {
+          "property": {
+            "properties": {
+              "input_revision": {
+                "type": "int64"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "data_in": [
+      {
+        "name": "asr_result"
+      },
+      {
+        "name": "jev_asr"
+      },
+      {
+        "name": "jev_playback"
+      },
+      {
+        "name": "jev_control"
+      },
+      {
+        "name": "tts_audio_start"
+      },
+      {
+        "name": "tts_audio_end"
+      },
+      {
+        "name": "tts_text_result"
+      },
+      {
+        "name": "llm_evidence",
+        "property": {
+          "properties": {
+            "phase": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "wall_time_ns": {
+              "type": "int64"
+            },
+            "monotonic_ns": {
+              "type": "int64"
+            },
+            "body": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      },
+      {
+        "name": "jev_rtc_playback"
+      }
+    ],
+    "data_out": [
+      {
+        "name": "jev_event"
+      },
+      {
+        "name": "tts_text_input"
+      },
+      {
+        "name": "tts_flush"
+      }
+    ],
+    "audio_frame_in": [
+      {
+        "name": "pcm_frame"
+      }
+    ],
+    "audio_frame_out": [
+      {
+        "name": "pcm_frame"
+      }
+    ]
+  }
+}
