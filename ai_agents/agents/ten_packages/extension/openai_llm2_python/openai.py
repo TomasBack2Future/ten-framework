@@ -70,9 +70,7 @@ class OpenAIChatGPT:
     def __init__(self, ten_env: AsyncTenEnv, config: OpenAILLM2Config):
         self.config = config
         self.ten_env = ten_env
-        ten_env.log_info(
-            f"OpenAIChatGPT initialized with config: {config.api_key}"
-        )
+        ten_env.log_info("OpenAIChatGPT initialized")
         self.http_client = None
         if config.proxy_url:
             ten_env.log_info(f"Setting httpx proxy: {config.proxy_url}")
@@ -239,7 +237,9 @@ class OpenAIChatGPT:
                 self.ten_env.log_debug(f"set openai param: {key} = {value}")
                 req[key] = value
 
-        self.ten_env.log_info(f"Requesting chat completions with: {req}")
+        self.ten_env.log_info(
+            f"Requesting chat completions: message_count={len(req['messages'])}"
+        )
 
         try:
             response: AsyncStream[ChatCompletionChunk] = (

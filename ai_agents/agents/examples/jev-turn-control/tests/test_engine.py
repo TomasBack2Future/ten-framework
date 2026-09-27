@@ -153,7 +153,7 @@ def test_estimate_never_claims_exact():
     engine = make()
     rid = start(engine)
     engine.output(rid, "abcdefghijklmnopqrstuvwxyz", 500)
-    engine.playback(rid, 500, 1000, completed=True)
+    engine.playback(rid, 500, 1000, stopped=True)
     assert engine.history[-1]["text"] == "abcdefg"
     assert engine.history[-1]["precision"] == "character_rate_estimate"
 
@@ -290,7 +290,7 @@ def test_finished_context_is_bounded():
         engine.output(rid, "hello", engine.now)
         engine.playback(rid, 500, engine.now + 500, completed=True)
     assert len(engine.finished) == 2
-    assert len(engine.history) == 2
+    assert len(engine.history) == 10
     assert not engine.responses
 
 
@@ -601,9 +601,21 @@ def test_response_context_precedes_current_user_append():
         assert not any(
             item["text"] == action["input_text"] for item in action["context"]
         )
-        if index:
-            assert action["context"][0]["role"] == "user"
-            assert action["context"][0]["text"] == f"question {index - 1}"
+        # context_responses bounds the late-ACK cache, not conversation history.
+        assert [
+            item["text"] for item in action["context"] if item["role"] == "user"
+        ] == [f"question {prior}" for prior in range(index)]
         rid = engine.active
         engine.output(rid, "An answer", engine.now + 100)
         engine.playback(rid, 1000, engine.now + 500, completed=True)
+
+
+def test_normalized_consumed_partial_does_not_duplicate_history_on_final():
+    engine = make()
+    engine.input("  My   name is Maya  ", False, 0, "s1")
+    engine.start("answer")
+    revision = engine.revision
+    engine.input("My name is Maya", True, 500, "s1")
+    assert engine.revision == revision
+    assert not engine.pending
+    assert engine.history == [{"role": "user", "text": "My name is Maya"}]

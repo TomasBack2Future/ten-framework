@@ -16,6 +16,13 @@ def graph_for(mode, overrides):
         "observation": {"include_text": True},
     }
     allowed = {
+        "voice.prompt",
+        "compression.enabled",
+        "compression.prompt",
+        "compression.summary_prompt",
+        "compression.trigger_chars",
+        "compression.keep_turns",
+        "compression.timeout_ms",
         "turn.enabled",
         "start.enabled",
         "stop.enabled",
@@ -29,10 +36,15 @@ def graph_for(mode, overrides):
             raise ValueError("unsupported session override")
         if key.endswith(".enabled") and not isinstance(value, bool):
             raise ValueError("boolean required")
-        if key.endswith(".prompt") and (
+        if key.endswith("prompt") and (
             not isinstance(value, str) or len(value) > 2000
         ):
             raise ValueError("prompt must be at most 2000 characters")
+        limits = {"compression.trigger_chars": (1000, 24000),
+                  "compression.keep_turns": (1, 12),
+                  "compression.timeout_ms": (1000, 30000)}
+        if key in limits and (type(value) is not int or not limits[key][0] <= value <= limits[key][1]):
+            raise ValueError("numeric setting outside allowed range")
         section, option = key.split(".")
         config.setdefault(section, {})[option] = value
     graph = {

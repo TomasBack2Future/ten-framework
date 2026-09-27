@@ -2,6 +2,7 @@
 
 from collections import deque
 from copy import deepcopy
+import math
 
 from .config import Config
 
@@ -36,9 +37,14 @@ class TurnEngine:
         self.stopping = None
         self.responses = {}
         self.finished = {}
-        self.history = deque(
-            maxlen=self.config["playback"]["context_responses"]
-        )
+        self.history = []
+        self.context_revision = 0
+        self.summary = ""
+        self.compression_request = None
+        self.compression_attempt = -100000
+        self.capacity_reached = False
+        self.consumed_segment = None
+        self.consumed_text = ""
         self.last_backchannel = -100000
         self.closed = False
         self.paused = False
@@ -103,7 +109,10 @@ class TurnEngine:
             "stopping_response_id": self.stopping,
             "timer": deepcopy(self.timer),
             "inflight": self.inflight is not None,
-            "context": list(self.history),
+            "context": deepcopy(self.history),
+            "context_summary": self.summary,
+            "context_revision": self.context_revision,
+            "context_capacity_reached": self.capacity_reached,
             "mode": self.config["provider"]["name"],
             "playback_precision": "browser_cursor_estimate",
         }
@@ -114,6 +123,9 @@ class TurnEngine:
             return
         self.now = now
         text = " ".join(text[:12000].split())
+        # A repeated final for the partial already used to answer is not a new turn.
+        if segment_id == self.consumed_segment and text == self.consumed_text:
+            return
         if segment_id != self.segment:
             if self.segment:
                 self.committed = self.text
@@ -225,7 +237,8 @@ class TurnEngine:
                 "input_text": self.text,
                 "asr_final": self.final,
                 "assistant_speaking": bool(self.active),
-                "heard_context": deepcopy(list(self.history)),
+                "heard_context": deepcopy(self.history),
+                "older_context_summary": self.summary,
                 "silence_ms": now - self.last_input,
             },
         }
@@ -447,6 +460,19 @@ class TurnEngine:
     def start(self, mode):
         if self.active or self.stopping or self.closed:
             return
+        cfg = self.config["compression"]
+        if mode != "backchannel" and (
+            self.context_size() + len(self.text) + 24000 > cfg["max_chars"]
+            or len(self.history) + 2 > cfg["max_messages"]
+        ):
+            if not self.capacity_reached:
+                self.emit(
+                    "context.capacity",
+                    {"reason": "history_limit", "recoverable": False},
+                )
+            self.capacity_reached = True
+            self.pending = False
+            return
         self.epoch += 1
         rid = f"{self.session_id}-r{self.epoch}"
         self.active = rid
@@ -454,12 +480,23 @@ class TurnEngine:
             "text": "",
             "played_ms": 0,
             "alignment": [],
+            "pending_alignment": [],
+            "audio_origin_ms": None,
             "mode": mode,
             "precision": "unknown",
             "generation_done": False,
+            "audio_done": False,
+            "audio_end_received": False,
+            "audio_failed": False,
+            "expected_audio_ms": None,
+            "unverified_completion": False,
+            "audio_ms": 0,
+            "fully_played": False,
         }
         if mode != "backchannel":
             self.pending = False
+            self.consumed_segment = self.segment
+            self.consumed_text = self.text[len(self.committed) :].strip()
             self.committed = ""
             self.segment = ""
             self.cancel_timer("response_started")
@@ -479,7 +516,9 @@ class TurnEngine:
             response_id=rid,
             mode=mode,
             input_text=self.text,
-            context=list(self.history),
+            context=deepcopy(self.history),
+            summary=self.summary,
+            context_revision=self.context_revision,
             phrase=(
                 self.config["backchannel"]["phrases"][0]
                 if mode == "backchannel"
@@ -489,6 +528,7 @@ class TurnEngine:
 
         if mode != "backchannel":
             self.history.append({"role": "user", "text": self.text})
+            self.context_revision += 1
 
     def stop(self, reason):
         if not self.active:
@@ -520,7 +560,53 @@ class TurnEngine:
         )
         return True
 
+    def audio(
+        self,
+        rid,
+        duration_ms=0,
+        completed=False,
+        timestamp=None,
+        expected_ms=None,
+        normal=True,
+    ):
+        response = self.responses.get(rid)
+        if response is not None:
+            if timestamp is not None and response["audio_origin_ms"] is None:
+                response["audio_origin_ms"] = timestamp - response["audio_ms"]
+            response["audio_ms"] += duration_ms
+            if completed:
+                valid = (
+                    normal
+                    and isinstance(expected_ms, (int, float))
+                    and not isinstance(expected_ms, bool)
+                    and math.isfinite(expected_ms)
+                    and 0 < expected_ms <= 3600000
+                )
+                if response["audio_end_received"]:
+                    valid = (
+                        valid
+                        and response["audio_done"]
+                        and expected_ms == response["expected_audio_ms"]
+                    )
+                response["audio_done"] = valid
+                response["audio_end_received"] = True
+                response["audio_failed"] = (
+                    response["audio_failed"] or not normal
+                )
+                response["expected_audio_ms"] = expected_ms if valid else None
+            if (
+                response["pending_alignment"]
+                and response["audio_origin_ms"] is not None
+            ):
+                words, response["pending_alignment"] = (
+                    response["pending_alignment"],
+                    [],
+                )
+                self.align(rid, words)
+
     def heard(self, response):
+        if response["fully_played"]:
+            return response["text"], "browser_completed_estimate"
         words = response["alignment"]
         if words:
             return (
@@ -531,6 +617,8 @@ class TurnEngine:
                 ),
                 "provider_alignment_browser_cursor",
             )
+        if response["audio_failed"] or response["unverified_completion"]:
+            return "", "unverified_completion"
         count = int(
             response["played_ms"]
             / 1000
@@ -542,13 +630,34 @@ class TurnEngine:
         response = self.responses.get(rid) or self.finished.get(rid)
         if response is None:
             return
-        valid = [
-            w
-            for w in words
-            if isinstance(w.get("text"), str)
-            and isinstance(w.get("end_ms"), (int, float))
-            and 0 <= w["end_ms"] <= 3600000
-        ]
+        valid = []
+        for word in words:
+            end = word.get("end_ms")
+            if not isinstance(word.get("text"), str) or not isinstance(
+                end, (int, float)
+            ):
+                continue
+            # Cartesia's TEN adapter emits epoch milliseconds for both audio and
+            # words. Browser cursors are relative PCM duration, never epoch time.
+            if end > 3600000:
+                origin = response["audio_origin_ms"]
+                if origin is None:
+                    response["pending_alignment"] = (
+                        response["pending_alignment"] + [word]
+                    )[-5000:]
+                    continue
+                end -= origin
+            if 0 <= end <= 3600000:
+                valid.append({"text": word["text"], "end_ms": end})
+        self.emit(
+            "playback.alignment",
+            {
+                "received_words": len(words),
+                "normalized_words": len(valid),
+                "pending_words": len(response["pending_alignment"]),
+            },
+            rid,
+        )
         response["alignment"] = sorted(
             response["alignment"] + valid, key=lambda w: w["end_ms"]
         )[:5000]
@@ -556,7 +665,9 @@ class TurnEngine:
             heard, precision = self.heard(response)
             for item in self.history:
                 if item.get("response_id") == rid:
-                    item.update(text=heard, precision=precision)
+                    if item["text"] != heard or item["precision"] != precision:
+                        item.update(text=heard, precision=precision)
+                        self.context_revision += 1
             self.emit(
                 "playback.progress",
                 {
@@ -578,11 +689,56 @@ class TurnEngine:
         confirmed=True,
     ):
         self.now = now
+        if rid in self.finished and stopped:
+            response = self.finished[rid]
+            if response["fully_played"]:
+                return
+            response["played_ms"] = min(
+                max(0, played_ms), response["audio_ms"] or 3600000
+            )
+            heard, precision = self.heard(response)
+            for item in self.history:
+                if item.get("response_id") == rid:
+                    item.update(
+                        text=heard, precision=precision, confirmed=confirmed
+                    )
+                    self.context_revision += 1
+            self.emit(
+                "playback.stopped",
+                {
+                    "played_ms": response["played_ms"],
+                    "heard_text": heard,
+                    "precision": precision,
+                    "confirmed": confirmed,
+                    "late_ack": True,
+                },
+                rid,
+            )
+            return
         if rid not in self.responses or rid not in (self.active, self.stopping):
             return
         response = self.responses[rid]
-        response["played_ms"] = max(
-            response["played_ms"], min(max(0, played_ms), 3600000)
+        cursor = min(max(0, played_ms), response["audio_ms"] or 3600000)
+        response["played_ms"] = (
+            cursor
+            if confirmed and (stopped or completed)
+            else max(response["played_ms"], cursor)
+        )
+        response["fully_played"] = bool(
+            completed
+            and not stopped
+            and confirmed
+            and response["generation_done"]
+            and response["audio_done"]
+            and response["audio_ms"] > 0
+            # Provider duration and forwarded PCM duration are both milliseconds.
+            # 2 ms covers integer rounding, not missing audio chunks.
+            and response["expected_audio_ms"] is not None
+            and abs(response["audio_ms"] - response["expected_audio_ms"]) <= 2
+            and response["played_ms"] >= response["audio_ms"] - 30
+        )
+        response["unverified_completion"] = (
+            completed and not response["fully_played"]
         )
         heard, precision = self.heard(response)
         response["precision"] = precision
@@ -598,15 +754,18 @@ class TurnEngine:
             rid,
         )
         if stopped or completed:
-            self.history.append(
-                {
-                    "role": "assistant",
-                    "text": heard,
-                    "response_id": rid,
-                    "precision": precision,
-                    "confirmed": confirmed,
-                }
-            )
+            if response["mode"] != "backchannel":
+                self.history.append(
+                    {
+                        "role": "assistant",
+                        "text": heard,
+                        "response_id": rid,
+                        "precision": precision,
+                        "confirmed": confirmed,
+                        "fully_played": response["fully_played"],
+                    }
+                )
+                self.context_revision += 1
             if self.active == rid:
                 self.active = None
             if self.stopping == rid:
@@ -618,6 +777,115 @@ class TurnEngine:
             ):
                 del self.finished[next(iter(self.finished))]
             del self.responses[rid]
+
+    def context_size(self):
+        return len(self.summary) + sum(
+            len(item["text"]) for item in self.history
+        )
+
+    def begin_compression(self, now):
+        cfg = self.config["compression"]
+        if (
+            not cfg["enabled"]
+            or self.closed
+            or self.compression_request
+            or self.active
+            or self.stopping
+            or self.pending
+            or now - self.compression_attempt < cfg["cooldown_ms"]
+            or self.context_size() < cfg["trigger_chars"]
+        ):
+            return None
+        starts = [
+            i for i, item in enumerate(self.history) if item["role"] == "user"
+        ]
+        if len(starts) <= cfg["keep_turns"]:
+            return None
+        cutoff = starts[-cfg["keep_turns"]]
+        # Interrupted assistant text is deliberately excluded: alignment may arrive
+        # later. Only full browser-confirmed playback is eligible for summaries.
+        source = [
+            deepcopy(item)
+            for item in self.history[:cutoff]
+            if item["role"] == "user" or item.get("fully_played")
+        ]
+        request = {
+            "context_revision": self.context_revision,
+            "cutoff": cutoff,
+            "source": source,
+            "summary": self.summary,
+            "kinds": ["compression"],
+            "state": {
+                "previous_summary": self.summary,
+                "confirmed_context": source,
+                "context_characters": self.context_size(),
+                "retained_turns": cfg["keep_turns"],
+            },
+        }
+        self.compression_request = request
+        self.compression_attempt = now
+        self.emit(
+            "context.decision",
+            {
+                "phase": "started",
+                "context_revision": self.context_revision,
+                "characters": self.context_size(),
+            },
+        )
+        return deepcopy(request)
+
+    def compression_current(self, request):
+        return (
+            not self.closed
+            and self.compression_request == request
+            and request["context_revision"] == self.context_revision
+        )
+
+    def complete_compression(self, request, summary=None, error=None):
+        if self.compression_request != request:
+            return
+        current = self.compression_current(request)
+        self.compression_request = None
+        if not current:
+            self.emit(
+                "context.stale",
+                {"context_revision": request["context_revision"]},
+            )
+            return
+        if error:
+            self.emit(
+                "context.failed", {"reason": error, "original_retained": True}
+            )
+            return
+        if summary is None:
+            return
+        cfg = self.config["compression"]
+        old_chars = len(self.summary) + sum(
+            len(i["text"]) for i in self.history[: request["cutoff"]]
+        )
+        if (
+            not summary.strip()
+            or len(summary) > cfg["max_summary_chars"]
+            or len(summary) >= old_chars
+        ):
+            self.emit(
+                "context.failed",
+                {"reason": "invalid_summary", "original_retained": True},
+            )
+            return
+        self.summary = summary
+        self.history = self.history[request["cutoff"] :]
+        self.context_revision += 1
+        self.capacity_reached = False
+        self.emit(
+            "context.applied",
+            {
+                "context_revision": self.context_revision,
+                "summary_characters": len(summary),
+                "removed_messages": request["cutoff"],
+                "retained_messages": len(self.history),
+            },
+        )
 
     def pause(self, now):
         self.now = now

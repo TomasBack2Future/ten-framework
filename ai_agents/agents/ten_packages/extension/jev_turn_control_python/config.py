@@ -4,6 +4,20 @@ from dataclasses import dataclass, field
 from copy import deepcopy
 
 DEFAULTS = {
+    "voice": {"prompt": ""},
+    "compression": {
+        "enabled": False,
+        "prompt": "",
+        "summary_prompt": "",
+        "threshold": 0.7,
+        "trigger_chars": 8000,
+        "keep_turns": 3,
+        "timeout_ms": 10000,
+        "cooldown_ms": 30000,
+        "max_summary_chars": 4000,
+        "max_chars": 48000,
+        "max_messages": 128,
+    },
     "turn": {"enabled": True},
     "start": {"enabled": True, "prompt": "", "threshold": 0.6},
     "stop": {
@@ -98,7 +112,7 @@ class Config:
             for key, value in options.items():
                 if key.endswith("_ms") and not 0 <= value <= 60000:
                     raise ValueError(f"out of range: {section}.{key}")
-                if key == "prompt" and len(value) > 2000:
+                if key.endswith("prompt") and len(value) > 2000:
                     raise ValueError("prompt exceeds 2000 characters")
                 if key == "threshold" and not 0 <= value <= 1:
                     raise ValueError("threshold outside [0,1]")
@@ -133,6 +147,19 @@ class Config:
             raise ValueError("context_responses outside [1,64]")
         if not 1 <= self["playback"]["chars_per_second"] <= 50:
             raise ValueError("chars_per_second outside [1,50]")
+        comp = self["compression"]
+        if not 1000 <= comp["trigger_chars"] <= 24000:
+            raise ValueError("trigger_chars outside [1000,24000]")
+        if not 1 <= comp["keep_turns"] <= 12:
+            raise ValueError("keep_turns outside [1,12]")
+        if not 1000 <= comp["timeout_ms"] <= 30000:
+            raise ValueError("compression timeout outside [1000,30000]")
+        if not 500 <= comp["max_summary_chars"] <= 8000:
+            raise ValueError("max_summary_chars outside [500,8000]")
+        if not comp["trigger_chars"] + 16000 <= comp["max_chars"] <= 96000:
+            raise ValueError("max_chars must reserve one 16000-character input")
+        if not 32 <= comp["max_messages"] <= 256:
+            raise ValueError("max_messages outside [32,256]")
         phrases = self["backchannel"]["phrases"]
         if not 1 <= len(phrases) <= 8 or any(
             not isinstance(p, str) or not 1 <= len(p) <= 40 for p in phrases

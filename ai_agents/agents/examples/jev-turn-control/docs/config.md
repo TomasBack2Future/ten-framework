@@ -108,3 +108,73 @@ The protected demo runner opts in to include_text; base extension stays redacted
 `stop.max_wait_ms=800` conservatively yields if high-frequency input prevents
 any current stop judgment from applying. Supported short acknowledgments that
 have a current continue judgment do not trigger this fallback.
+
+## Conversation memory and voice prompt
+
+`voice.prompt` overrides the default voice assistant prompt (max 2000 characters).
+The default describes the actual TEN → Soniox → Jev turn decisions → Groq →
+Cartesia path, answers briefly in the user's language, asks at most one question,
+and explicitly has no search, booking, filesystem or executor capability.
+The official OpenAI-compatible adapter receives one `request.prompt` system message,
+followed by all retained user/assistant messages and the current user input.
+`context.request` records message counts/revision, never an API key.
+
+History no longer silently evicts the oldest message every 12 entries. Completed
+playback commits full text only after LLM completion, TTS completion, nonempty audio
+and a matching browser drain cursor. This remains a browser estimate, not acoustic
+proof. Stops use Cartesia word times normalized by the first PCM frame timestamp;
+without alignment the character estimate remains marked. Late stop ACKs/word times
+can repair retained old replies without reactivating them. Backchannels do not enter
+main history. `playback.context_responses` now bounds late-correction response records,
+not the conversation message window. New calls start fresh; reconnect within the
+10-second grace keeps the same call. End call destroys memory.
+
+## Optional background compression
+
+Default **off**, independent of turn/start/stop/backchannel settings. Enable in the
+session panel or set `compression.enabled` on the controller. Compression never
+blocks foreground speech or grants permission to start speaking.
+
+| Setting | Default | Meaning |
+|---|---:|---|
+| `enabled` | false | Run background memory jobs |
+| `trigger_chars` | 8000 | Soft trigger, configurable 1000–24000 |
+| `keep_turns` | 3 | Preserve recent user turns and their replies verbatim (1–12) |
+| `threshold` | 0.7 | Minimum Jev compress probability |
+| `prompt` | built in | Jev compress/retain rubric override, max 2000 chars |
+| `summary_prompt` | built in | Groq summary instructions override, max 2000 chars |
+| `timeout_ms` | 10000 | Total decision + summary deadline (1000–30000) |
+| `cooldown_ms` | 30000 | Minimum interval between attempts |
+| `max_summary_chars` | 4000 | Reject oversized/empty/nonshrinking summaries |
+| `max_chars` | 48000 | Hard history+summary capacity; reserve 24000 for each answer |
+| `max_messages` | 128 | Hard retained-message capacity |
+
+A job snapshots old history with a context revision. Jev chooses compress/retain;
+Groq summarizes only user messages and fully browser-confirmed assistant replies.
+Interrupted assistant estimates are excluded from summaries even with word times,
+since late alignment may still revise them. Names, constraints and pending requests
+must be preserved without inferring diagnoses/gender or attributing assistant
+suggestions to the user. Recent turns remain unchanged. New history/late corrections
+invalidate stale results. Provider failures/timeouts keep original history. At the
+hard capacity the controller emits `context.capacity` and stops adding replies;
+the UI asks for a new call rather than silently forgetting facts.
+
+Events: `context.decision` (started/completed), `context.summary` (started),
+`context.applied`, `context.stale`, `context.failed`, `context.capacity` and
+`context.request`. Summarization is lossy and remains opt-in; provider-level fixed
+cases are not a guarantee for arbitrary conversations.
+
+Full-playback integrity additionally requires `tts_audio_end.reason=REQUEST_END`
+(`1`) and a finite positive provider `request_total_audio_duration_ms`. Its unit is
+milliseconds; it must match forwarded PCM sample duration within **2 ms** (integer
+rounding only). Missing/mismatched duration, `INTERRUPTED` (`2`) or `ERROR` (`3`)
+never authorizes full text. Duplicate consistent ends are idempotent; an abnormal
+end cannot be upgraded by a later normal end. Without word alignment an unverified
+completion stores no guessed text. Browser drain cursor tolerance remains 30 ms
+and is explicitly an estimate; it is not acoustic proof.
+
+Summary payloads must contain a nonempty `choices` array, a message with nonempty
+string content, and `finish_reason=stop`. Every job releases its reservation even
+on unexpected provider exceptions, timeout or cancellation. Cancellation is
+re-raised (not swallowed), failures keep original memory, and cooldown limits
+subsequent attempts.

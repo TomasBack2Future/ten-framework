@@ -1,0 +1,89 @@
+name: Jev demo
+on:
+  push:
+    branches: [feat/jev-web-deploy, integration/jev-mvp, chore/jev-oss-bootstrap]
+    paths: ['ai_agents/agents/examples/jev-turn-control/**', 'ai_agents/agents/ten_packages/extension/jev_turn_control_python/**', 'ai_agents/agents/ten_packages/extension/websocket_server/**', 'ai_agents/agents/ten_packages/extension/openai_llm2_python/**', '.github/workflows/jev-demo.yml']
+  pull_request:
+    paths: ['ai_agents/agents/examples/jev-turn-control/**', 'ai_agents/agents/ten_packages/extension/jev_turn_control_python/**', 'ai_agents/agents/ten_packages/extension/websocket_server/**', 'ai_agents/agents/ten_packages/extension/openai_llm2_python/**', '.github/workflows/jev-demo.yml']
+permissions:
+  contents: read
+concurrency:
+  group: jev-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  web:
+    if: github.repository == 'TomasBack2Future/ten-framework'
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with: {node-version: '22', cache: npm, cache-dependency-path: ai_agents/agents/examples/jev-turn-control/web/package-lock.json}
+    - run: npm ci --ignore-scripts && npm run check && npm test && npx prettier --check public/*.js public/*.css public/*.html server.mjs observations.mjs test/*.mjs
+      working-directory: ai_agents/agents/examples/jev-turn-control/web
+    - name: Build credential-free web preview
+      run: docker build --build-arg REVISION=${{ github.sha }} -t jev-web-test -f ai_agents/agents/examples/jev-turn-control/web/Dockerfile ai_agents/agents/examples/jev-turn-control
+    - name: Smoke preview image
+      run: |
+        docker run -d --name jev-smoke -e JEV_ALLOW_LOCAL=1 -p 127.0.0.1:3300:3000 jev-web-test
+        for i in $(seq 1 20); do curl -fsS http://127.0.0.1:3300/healthz && exit 0; sleep 1; done
+        docker logs jev-smoke
+        exit 1
+  publish:
+    needs: web
+    if: github.event_name == 'push' && github.repository == 'TomasBack2Future/ten-framework'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - uses: actions/checkout@v4
+    - uses: docker/setup-buildx-action@v3
+    - uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - uses: docker/build-push-action@v6
+      with:
+        context: ai_agents/agents/examples/jev-turn-control
+        file: ai_agents/agents/examples/jev-turn-control/web/Dockerfile
+        push: true
+        tags: ghcr.io/tomasback2future/jev-turn-control-web:${{ github.sha }}
+        build-args: REVISION=${{ github.sha }}
+# Cluster deploy is deliberately local: no kubeconfig or cluster secret in Actions.
+  runtime:
+    needs: web
+    if: github.repository == 'TomasBack2Future/ten-framework'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - uses: actions/checkout@v4
+    - name: Fetch pinned public TEN manager
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        mkdir -p .bootstrap/tools
+        gh release download 0.11.73 --repo TEN-framework/ten-framework --pattern tman-linux-release-x64.zip --dir .bootstrap/tools
+        cd .bootstrap/tools
+        echo '1ac22f455cc0be5f2541701bd38cacecc918f41a1b1b891889c71914cc3b3ab2  tman-linux-release-x64.zip' | sha256sum -c -
+        unzip -q tman-linux-release-x64.zip
+    - name: Build full public TEN runtime
+      run: docker build --build-arg REVISION=${{ github.sha }} -t ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} -f ai_agents/agents/examples/jev-turn-control/Dockerfile .
+    - name: Native graph smoke without network or credentials
+      run: |
+        docker run --rm --network none ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} node web/test/runtime-smoke.mjs
+        docker run --rm --network none ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} bash scripts/smoke.sh
+        docker run --rm --network none ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} .venv/bin/python -m unittest discover -s executor/tests -p test_adapter.py
+        docker run --rm --network none ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} .venv/bin/python -m unittest discover -s executor/tests -p test_review_lifecycle.py
+        docker run --rm --network none ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }} .venv/bin/python -m unittest discover -s executor/tests -p test_evaluation.py
+    - uses: docker/login-action@v3
+      if: github.event_name == 'push'
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Publish tested immutable revision
+      if: github.event_name == 'push'
+      run: docker push ghcr.io/tomasback2future/jev-turn-control:${{ github.sha }}
