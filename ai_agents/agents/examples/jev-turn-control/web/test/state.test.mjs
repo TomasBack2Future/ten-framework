@@ -74,6 +74,50 @@ test("cancel stops active and queued sources; late audio cannot restart old resp
   await p.destroy();
 });
 
+test("an early PCM chunk joins the previous one without a forced gap", async () => {
+  const starts = [];
+  class Context {
+    currentTime = 0;
+    destination = {};
+    createGain() {
+      return { gain: { value: 1 }, connect() {} };
+    }
+    async resume() {}
+    async close() {}
+    createBuffer(_channels, samples, rate) {
+      return {
+        duration: samples / rate,
+        getChannelData: () => new Float32Array(samples),
+      };
+    }
+    createBufferSource() {
+      return {
+        connect() {},
+        disconnect() {},
+        start(at) { starts.push(at); },
+        stop() {},
+      };
+    }
+  }
+  const p = new Player(() => {}, Context);
+  await p.unlock();
+  p.begin("r1");
+  const chunk = {
+    audio: btoa("\0".repeat(3200)),
+    metadata: {
+      response_id: "r1",
+      sample_rate: 16000,
+      channels: 1,
+      bytes_per_sample: 2,
+    },
+  };
+  p.play(chunk);
+  p.ctx.currentTime = p.next - 0.005;
+  p.play(chunk);
+  assert.equal(starts[1], starts[0] + 0.1);
+  await p.destroy();
+});
+
 test("end notification arriving before the final PCM batch does not discard audio", async () => {
   let source;
   class Context {

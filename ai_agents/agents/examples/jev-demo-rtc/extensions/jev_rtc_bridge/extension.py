@@ -56,7 +56,7 @@ class JevRTCBridge(AsyncExtension):
         frame.set_sample_rate(16000)
         frame.set_number_of_channels(1)
         frame.set_bytes_per_sample(2)
-        frame.set_samples_per_channel(160)
+        frame.set_samples_per_channel(len(pcm) // 2)
         frame.alloc_buf(len(pcm))
         buf = frame.lock_buf()
         buf[:] = pcm
@@ -165,7 +165,19 @@ class JevRTCBridge(AsyncExtension):
         buf = frame.lock_buf()
         pcm = bytes(buf)
         frame.unlock_buf(buf)
-        self.playout.enqueue(rid, pcm)
+        if not pcm or len(pcm) % 2:
+            raise ValueError("RTC bridge expects nonempty PCM16 samples")
+        try:
+            await self.playout.send(rid, pcm)
+        except Exception:
+            await self.data("jev_control", {"action": "stop"})
+            await self.broadcast(
+                {
+                    "type": "error",
+                    "error": "RTC publisher failed; end this session and reconnect",
+                }
+            )
+            raise
 
     async def on_cmd(self, ten_env, cmd):
         if cmd.get_name() == "on_connected":

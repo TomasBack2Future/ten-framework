@@ -60,8 +60,7 @@ class ReducerTransportTests(unittest.IsolatedAsyncioTestCase):
 
         p = transport.RTCPlayout(command, audio, feedback, lambda: 0)
         await p.start(first)
-        p.enqueue(first, bytes(320))
-        await p.step()
+        await p.send(first, bytes(320))
         engine.stop("manual_stop")
         await p.stop(first)
         self.assertIsNone(engine.stopping)

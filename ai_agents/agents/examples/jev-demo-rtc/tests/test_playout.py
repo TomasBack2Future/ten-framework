@@ -27,54 +27,28 @@ class PlayoutTests(unittest.IsolatedAsyncioTestCase):
 
         self.p = module.RTCPlayout(command, frame, feedback, lambda: self.now)
 
-    async def test_chunks_are_paced_without_catchup_bursts(self):
+    async def test_chunks_are_forwarded_immediately_without_agent_queue(self):
         await self.p.start("r1")
-        self.p.enqueue("r1", bytes(1280))
-        await self.p.step()
-        await self.p.step()
-        self.assertEqual(sum(c[0] == "audio" for c in self.calls), 1)
-        self.now = 10
-        await self.p.step()
-        await self.p.step()
-        self.assertEqual(sum(c[0] == "audio" for c in self.calls), 2)
-        self.assertTrue(all(c[2] == 320 for c in self.calls if c[0] == "audio"))
-
-    async def test_send_overhead_does_not_accumulate_into_frame_schedule(self):
-        async def slow_frame(rid, pcm):
-            self.calls.append(("audio", rid, len(pcm)))
-            self.now += 0.003
-
-        self.p.send_frame = slow_frame
-        await self.p.start("r1")
-        self.p.enqueue("r1", bytes(320 * 4))
-        for now in (0, 0.01, 0.02, 0.03):
-            self.now = now
-            await self.p.step()
-        self.assertEqual(sum(c[0] == "audio" for c in self.calls), 4)
-
-    async def test_late_scheduler_sends_only_one_frame_per_step(self):
-        await self.p.start("r1")
-        self.p.enqueue("r1", bytes(320 * 20))
-        self.now = 1
-        await self.p.step()
-        await self.p.step()
-        self.assertEqual(sum(c[0] == "audio" for c in self.calls), 1)
-        self.assertLessEqual(self.p.next_at, self.now + 0.005)
+        self.assertEqual(self.calls, [])
+        await self.p.send("r1", bytes(1280))
+        await self.p.send("r1", bytes(640))
+        self.assertEqual(
+            [c for c in self.calls if c[0] == "audio"],
+            [("audio", "r1", 1280), ("audio", "r1", 640)],
+        )
 
     async def test_flush_unpublish_then_next_reply_publish(self):
         await self.p.start("r1")
-        self.p.enqueue("r1", bytes(1280))
-        await self.p.step()
+        await self.p.send("r1", bytes(1280))
         await self.p.stop("r1")
-        self.assertFalse(self.p.enqueue("r1", bytes(320)))
+        self.assertFalse(await self.p.send("r1", bytes(320)))
         self.assertEqual(
             [c[0] for c in self.calls],
             ["publish", "audio", "flush", "unpublish", "feedback"],
         )
         await self.p.start("r2")
-        self.p.enqueue("r2", bytes(320))
         await self.p.stop("r1")
-        await self.p.step()
+        await self.p.send("r2", bytes(320))
         self.assertEqual(self.calls[-2][0], "publish")
         self.assertEqual(self.calls[-1], ("audio", "r2", 320))
 
@@ -94,26 +68,41 @@ class PlayoutTests(unittest.IsolatedAsyncioTestCase):
         start = asyncio.create_task(self.p.start("r2"))
         await asyncio.sleep(0)
         self.assertFalse(start.done())
-        self.assertFalse(self.p.enqueue("r1", bytes(320)))
         release.set()
         await asyncio.gather(start, stop)
         self.assertEqual(self.p.response, "r2")
+        self.assertFalse(await self.p.send("r1", bytes(320)))
 
     async def test_natural_drain_is_estimate_and_terminal_not_generation_end(
         self,
     ):
         await self.p.start("r1")
-        self.p.enqueue("r1", bytes(641))
+        await self.p.send("r1", bytes(640))
         self.p.finish("r1")
-        self.assertEqual(len(self.p.queue), 3)
         self.assertFalse(any(c[0] == "feedback" for c in self.calls))
-        for now in [0, 0.02, 0.04, 0.06, 0.5]:
-            self.now = now
-            await self.p.step()
+        self.now = 0.24
+        await self.p.step()
+        self.assertFalse(any(c[0] == "feedback" for c in self.calls))
+        self.now = 0.27
+        await self.p.step()
         self.assertEqual(
             self.calls[-1], ("feedback", "r1", 0, {"completed": True})
         )
-        self.assertFalse(self.p.enqueue("r1", bytes(320)))
+        self.assertFalse(await self.p.send("r1", bytes(320)))
+
+    async def test_generation_end_does_not_complete_before_forwarded_audio_duration(self):
+        await self.p.start("r1")
+        await self.p.send("r1", bytes(32000))
+        self.p.finish("r1")
+        self.now = 0.5
+        await self.p.step()
+        self.assertEqual(self.p.response, "r1")
+        self.now = 1.25
+        await self.p.step()
+        self.assertEqual(self.p.response, None)
+        self.assertEqual(
+            self.calls[-1], ("feedback", "r1", 750, {"completed": True})
+        )
 
     async def test_failed_flush_prevents_next_reply(self):
         await self.p.start("r1")
@@ -126,7 +115,7 @@ class PlayoutTests(unittest.IsolatedAsyncioTestCase):
             await self.p.stop("r1")
         with self.assertRaises(RuntimeError):
             await self.p.start("r2")
-        self.assertFalse(self.p.enqueue("r1", bytes(320)))
+        self.assertFalse(await self.p.send("r1", bytes(320)))
 
 
 if __name__ == "__main__":
