@@ -1,0 +1,16 @@
+version: '3'
+tasks:
+  install:
+    cmds:
+      - bash scripts/install.sh
+      - cd web && npm install --ignore-scripts
+  run:
+    env:
+      JEV_MODE: live
+      JEV_GRAPH_COMMAND: '.venv/bin/python scripts/run_graph.py'
+    cmds:
+      - node web/server.mjs
+  test:
+    cmds:
+      - python3 -m unittest discover -s tests -v
+      - cd web && npm test && npm run check

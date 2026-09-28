@@ -1,0 +1,51 @@
+{
+  "type": "extension",
+  "name": "jev_rtc_bridge",
+  "version": "0.1.0",
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "=0.11.73"
+    }
+  ],
+  "api": {
+    "data_in": [
+      {
+        "name": "jev_event"
+      }
+    ],
+    "data_out": [
+      {
+        "name": "jev_control"
+      },
+      {
+        "name": "jev_rtc_playback"
+      }
+    ],
+    "audio_frame_in": [
+      {
+        "name": "pcm_frame"
+      }
+    ],
+    "audio_frame_out": [
+      {
+        "name": "pcm_frame"
+      }
+    ],
+    "cmd_in": [
+      {
+        "name": "on_connected"
+      },
+      {
+        "name": "on_disconnected"
+      },
+      {
+        "name": "on_connection_failure"
+      },
+      {
+        "name": "on_connection_error"
+      }
+    ]
+  }
+}

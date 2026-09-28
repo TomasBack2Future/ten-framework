@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jev-demo-rtc
+  namespace: ten-jev-demo
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: jev-demo-rtc}
+  template:
+    metadata:
+      labels: {app: jev-demo-rtc}
+    spec:
+      securityContext: {fsGroup: 1000}
+      volumes:
+      - name: evidence
+        persistentVolumeClaim: {claimName: jev-demo-rtc-evidence}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 15
+      containers:
+      - name: demo
+        image: ghcr.io/tomasback2future/jev-demo-rtc:REPLACE_WITH_SHA
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - {name: evidence, mountPath: /var/lib/jev-evidence}
+        ports: [{containerPort: 3000, name: http}]
+        env:
+        - {name: JEV_MODE, value: live}
+        - {name: AGORA_APP_ID, value: 518383bde9d44172961da1595e982189}
+        - {name: JEV_PUBLIC_ORIGIN, value: 'https://jev-demo-rtc.hipaa-poc.agoralab.co'}
+        - {name: JEV_SESSION_SECONDS, value: '300'}
+        # Kong overwrites X-Real-IP with $remote_addr (verified on this ingress).
+        - {name: JEV_TRUST_PROXY, value: '1'}
+        - {name: JEV_EVENT_LOG_DIR, value: /var/lib/jev-evidence}
+        envFrom:
+        - secretRef: {name: jev-provider-keys}
+        - secretRef: {name: jev-demo-rtc-agora}
+        resources:
+          requests: {cpu: 100m, memory: 256Mi}
+          limits: {cpu: '2', memory: 2Gi}
+        startupProbe:
+          httpGet: {path: /healthz, port: http}
+          failureThreshold: 30
+          periodSeconds: 5
+        readinessProbe:
+          httpGet: {path: /healthz, port: http}
+          periodSeconds: 5
+        livenessProbe:
+          httpGet: {path: /healthz, port: http}
+          periodSeconds: 15
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          seccompProfile: {type: RuntimeDefault}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jev-demo-rtc
+  namespace: ten-jev-demo
+  annotations:
+    konghq.com/read-timeout: '360000'
+    konghq.com/write-timeout: '360000'
+spec:
+  selector: {app: jev-demo-rtc}
+  ports: [{port: 80, targetPort: http}]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jev-demo-rtc
+  namespace: ten-jev-demo
+  annotations:
+    konghq.com/protocols: https
+    konghq.com/https-redirect-status-code: '308'
+spec:
+  ingressClassName: kong
+  tls:
+  - hosts: [jev-demo-rtc.hipaa-poc.agoralab.co]
+    secretName: jev-demo-rtc-tls
+  rules:
+  - host: jev-demo-rtc.hipaa-poc.agoralab.co
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: jev-demo-rtc
+            port: {number: 80}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jev-demo-rtc-evidence
+  namespace: ten-jev-demo
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 20Gi

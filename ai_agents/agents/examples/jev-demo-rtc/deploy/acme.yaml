@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jev-rtc-acme
+  namespace: ten-jev-demo
+data:
+  ready: ready
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jev-rtc-acme
+  namespace: ten-jev-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: jev-rtc-acme}
+  template:
+    metadata:
+      labels: {app: jev-rtc-acme}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: http
+        image: public.ecr.aws/docker/library/busybox:1.37.0
+        command: [httpd, -f, -p, '8080', -h, /acme]
+        ports: [{containerPort: 8080}]
+        resources:
+          requests: {cpu: 10m, memory: 16Mi}
+          limits: {cpu: 100m, memory: 32Mi}
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+        volumeMounts:
+        - {name: challenge, mountPath: /acme/.well-known/acme-challenge, readOnly: true}
+      volumes:
+      - name: challenge
+        configMap: {name: jev-rtc-acme}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jev-rtc-acme
+  namespace: ten-jev-demo
+spec:
+  selector: {app: jev-rtc-acme}
+  ports: [{port: 80, targetPort: 8080}]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jev-rtc-acme
+  namespace: ten-jev-demo
+spec:
+  ingressClassName: kong
+  rules:
+  - host: jev-demo-rtc.hipaa-poc.agoralab.co
+    http:
+      paths:
+      - path: /.well-known/acme-challenge/
+        pathType: Prefix
+        backend:
+          service:
+            name: jev-rtc-acme
+            port: {number: 80}
