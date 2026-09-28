@@ -1,20 +1,16 @@
-"""Serialized RTC publisher; no browser PCM queue or claimed audible ACK."""
+"""Serialized RTC publisher; forward accepted TTS frames without pacing."""
 
 import asyncio
-from collections import deque
 import time
 
 
 class RTCPlayout:
-    """Fence replies around flush/unpublish and pace 16 kHz mono PCM.
+    """Fence replies around flush/unpublish and immediately forward PCM.
 
     All SDK calls go through one lock, so a delayed flush from an older reply
-    cannot unpublish the next reply. The sender feeds exactly 10 ms at a time.
-    Cursors describe server emission, never confirmed browser playout.
+    cannot unpublish the next reply. Cursors describe server emission, never
+    confirmed browser playout.
     """
-
-    FRAME_BYTES = 320
-    FRAME_MS = 10
 
     def __init__(self, command, send_frame, feedback, clock=time.monotonic):
         self.command = command
@@ -23,11 +19,11 @@ class RTCPlayout:
         self.clock = clock
         self.lock = asyncio.Lock()
         self.response = None
-        self.queue = deque()
-        self.tail = b""
         self.sent_ms = 0
-        self.queued_bytes = 0
-        self.next_at = 0
+        self.last_feedback_ms = 0
+        self.finished_at = 0
+        self.first_sent_at = None
+        self.playback_end_at = 0
         self.done = False
         self.published = False
         self.closed = False
@@ -44,30 +40,42 @@ class RTCPlayout:
                 await self._stop()
             self.response = rid
             self.sent_ms = 0
+            self.last_feedback_ms = 0
             self.done = False
-            self.next_at = self.clock()
+            self.finished_at = 0
+            self.first_sent_at = None
+            self.playback_end_at = 0
 
-    def enqueue(self, rid, pcm):
-        if rid != self.response or self.closed or self.failed or self.done:
-            return False
-        if self.queued_bytes + len(self.tail) + len(pcm) > 64 * 1024 * 1024:
-            raise BufferError("RTC outgoing audio queue exhausted")
-        data = self.tail + pcm
-        complete = len(data) // self.FRAME_BYTES * self.FRAME_BYTES
-        for offset in range(0, complete, self.FRAME_BYTES):
-            self.queue.append(data[offset : offset + self.FRAME_BYTES])
-        self.queued_bytes += complete
-        self.tail = data[complete:]
-        return True
+    async def send(self, rid, pcm):
+        async with self.lock:
+            if (
+                rid != self.response
+                or self.closed
+                or self.failed
+                or self.done
+                or self.muted
+            ):
+                return False
+            try:
+                if not self.published:
+                    await self.command("publish", {"audio": True, "video": False})
+                    self.published = True
+                await self.send_frame(rid, pcm)
+            except Exception:
+                self.failed = True
+                raise
+            now = self.clock()
+            if self.first_sent_at is None:
+                self.first_sent_at = now
+            self.playback_end_at = max(self.playback_end_at, now) + len(pcm) / 32000
+            self.sent_ms += len(pcm) / 32
+            return True
 
     def finish(self, rid):
         if rid != self.response:
             return
-        if self.tail:
-            self.queue.append(self.tail.ljust(self.FRAME_BYTES, b"\0"))
-            self.queued_bytes += self.FRAME_BYTES
-            self.tail = b""
         self.done = True
+        self.finished_at = self.clock()
 
     async def stop(self, rid=None):
         async with self.lock:
@@ -77,12 +85,9 @@ class RTCPlayout:
 
     async def _stop(self):
         rid = self.response
-        # Invalidate BEFORE any async SDK operation: newly delivered old frames
-        # must not be enqueued while a flush is waiting for its command result.
+        # Invalidate before any SDK operation so old frames cannot be sent
+        # while a flush is waiting for its command result.
         self.response = None
-        self.queue.clear()
-        self.tail = b""
-        self.queued_bytes = 0
         self.done = False
         try:
             await self.command("flush", {})
@@ -97,48 +102,28 @@ class RTCPlayout:
     def cursor(self):
         # Conservative transport estimate; excludes a network/jitter allowance.
         # Muting is handled as cancellation, so unheard muted audio is excluded.
-        return max(0, self.sent_ms - 250)
+        if self.first_sent_at is None:
+            return 0
+        elapsed_ms = (self.clock() - self.first_sent_at) * 1000
+        return max(0, int(min(self.sent_ms, elapsed_ms) - 250))
 
     async def step(self):
         async with self.lock:
             if not self.response or self.closed or self.failed:
                 return
-            if self.muted:
-                self.queue.clear()
-                self.tail = b""
-                self.queued_bytes = 0
-                if self.done:
-                    rid, self.response = self.response, None
-                    await self.feedback(rid, 0, completed=True)
-                return
-            now = self.clock()
-            if now < self.next_at:
-                return
-            if self.queue:
-                if not self.published:
-                    await self.command(
-                        "publish", {"audio": True, "video": False}
-                    )
-                    self.published = True
-                frame = self.queue.popleft()
-                self.queued_bytes -= len(frame)
-                await self.send_frame(self.response, frame)
-                self.sent_ms += self.FRAME_MS
-                # Keep deadlines on the original media clock. Basing each one
-                # on send completion accumulates scheduler and SDK overhead,
-                # eventually feeding fewer than 100 frames per second.
-                interval = self.FRAME_MS / 1000
-                self.next_at = max(
-                    self.next_at + interval,
-                    self.clock() - 0.1,
-                    now + interval / 2,
-                )
-                if self.sent_ms % 200 == 0:
-                    await self.feedback(self.response, self.cursor())
-            elif self.done and now >= self.next_at + 0.25:
+            cursor = self.cursor()
+            if cursor - self.last_feedback_ms >= 200:
+                self.last_feedback_ms = cursor
+                await self.feedback(self.response, cursor)
+            if self.done and (
+                self.muted
+                or self.clock() >= max(self.finished_at, self.playback_end_at) + 0.25
+            ):
                 rid = self.response
                 self.response = None
-                await self.feedback(rid, self.cursor(), completed=True)
+                await self.feedback(
+                    rid, 0 if self.muted else self.cursor(), completed=True
+                )
 
     async def close(self):
         async with self.lock:

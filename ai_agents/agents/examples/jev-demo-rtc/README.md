@@ -11,9 +11,9 @@ The browser uses the same workflow UI assets, session controls and hidden unlimi
 ## Interruption contract
 
 1. Jev cancels the active reply and its generator/TTS, using the existing reducer.
-2. The RTC transport invalidates the reply and drops queued PCM before awaiting any SDK command.
+2. The RTC transport invalidates the reply before awaiting any SDK command. Accepted TTS PCM is forwarded immediately; the agent keeps no outgoing audio queue.
 3. It sends `flush`, then explicit audio `unpublish`, serializing both with outgoing frames. Failure prevents another reply from publishing.
-4. A new reply explicitly publishes before its first 10 ms PCM frame. Old response PCM and delayed old stop requests cannot affect it.
+4. A new reply explicitly publishes before its first TTS PCM frame. Old response PCM and delayed old stop requests cannot affect it.
 5. The browser handles `user-unpublished` and resubscribes after `user-published`; it does not hold a PCM buffer.
 
 The installed `agora_rtc =0.23.9-t1` manifest exposes `flush`, `publish`, and `unpublish` with an `audio` property. Its native libraries load and its graph connects to the RTC channel in a local container smoke test. The command sequence and browser tail behavior still need live audio acceptance; manifest and startup checks alone cannot prove that audio already in the network jitter buffer is silent.
@@ -42,7 +42,7 @@ npm test
 npm run check
 ```
 
-The offline tests cover pacing, old-response fencing, delayed flush vs new publish, fail-closed flush, natural drain, real reducer stop release, channel isolation, browser join/publish/subscribe, renewal, cleanup and late callbacks. Mock SDK tests do not establish actual RTC network behavior.
+The offline tests cover direct frame forwarding, old-response fencing, delayed flush vs new publish, fail-closed flush, natural drain, real reducer stop release, channel isolation, browser join/publish/subscribe, renewal, cleanup and late callbacks. Mock SDK tests do not establish actual RTC network behavior.
 
 ## Independent deployment
 

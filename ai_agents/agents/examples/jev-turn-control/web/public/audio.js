@@ -76,7 +76,12 @@ export class Player {
       return false;
     const bytes = Uint8Array.from(atob(message.audio), (c) => c.charCodeAt(0));
     if (bytes.length % 2 || bytes.length > 192000) return false;
-    const start = Math.max(this.next, this.ctx.currentTime + 0.015);
+    // A chunk that arrives before the scheduled end must join it exactly.
+    // Adding the startup lead to every chunk inserts a gap near that end.
+    const start =
+      this.timeline.length && this.next >= this.ctx.currentTime
+        ? this.next
+        : this.ctx.currentTime + 0.015;
     const view = new DataView(bytes.buffer);
     const buffer = this.ctx.createBuffer(1, bytes.length / 2, rate);
     const samples = buffer.getChannelData(0);
