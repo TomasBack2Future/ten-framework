@@ -124,8 +124,15 @@ class RTCPlayout:
                 self.queued_bytes -= len(frame)
                 await self.send_frame(self.response, frame)
                 self.sent_ms += self.FRAME_MS
-                # Never catch up with a burst after scheduler/network stalls.
-                self.next_at = self.clock() + self.FRAME_MS / 1000
+                # Keep deadlines on the original media clock. Basing each one
+                # on send completion accumulates scheduler and SDK overhead,
+                # eventually feeding fewer than 100 frames per second.
+                interval = self.FRAME_MS / 1000
+                self.next_at = max(
+                    self.next_at + interval,
+                    self.clock() - 0.1,
+                    now + interval / 2,
+                )
                 if self.sent_ms % 200 == 0:
                     await self.feedback(self.response, self.cursor())
             elif self.done and now >= self.next_at + 0.25:
