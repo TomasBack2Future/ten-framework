@@ -429,6 +429,23 @@ def test_nonfinal_clarification_waits_for_missing_referent():
     assert engine.responses[engine.active]["mode"] == "answer"
 
 
+def test_deferred_clarification_cannot_start_backchannel():
+    engine = make(backchannel={"enabled": True})
+    engine.input("你刚刚那个", False, 0, "speech")
+    request = engine.begin_decision(120)
+    assert request["kinds"] == ["start", "backchannel"]
+    engine.complete_decision(
+        request,
+        {
+            "start": answer("clarify"),
+            "backchannel": answer("backchannel"),
+        },
+        200,
+    )
+    assert not engine.active
+    assert engine.timer["label"] == "continuation"
+
+
 def test_latest_input_cancels_short_answer_and_continuation_deadlines():
     engine = make(scheduling={"max_wait_ms": 1000})
     engine.input("I will go to", False, 0)
