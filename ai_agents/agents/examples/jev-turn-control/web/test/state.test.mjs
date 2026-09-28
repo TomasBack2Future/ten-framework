@@ -94,7 +94,9 @@ test("an early PCM chunk joins the previous one without a forced gap", async () 
       return {
         connect() {},
         disconnect() {},
-        start(at) { starts.push(at); },
+        start(at) {
+          starts.push(at);
+        },
         stop() {},
       };
     }
