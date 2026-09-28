@@ -9,6 +9,9 @@ export class RTCConnection {
     this.client = null;
     this.local = null;
     this.remote = null;
+    this.joined = false;
+    this.micOn = false;
+    this.micRegistered = false;
     this.muted = false;
     this.blocked = false;
   }
@@ -88,6 +91,8 @@ export class RTCConnection {
           const next = await this.fetchToken();
           if (!current()) return;
           await client.leave();
+          this.joined = false;
+          this.micRegistered = false;
           if (!current()) return;
           await client.join(
             credentials.app_id,
@@ -99,7 +104,11 @@ export class RTCConnection {
             await client.leave();
             return;
           }
-          await client.publish([this.local]);
+          this.joined = true;
+          if (this.micOn) {
+            await client.publish([this.local]);
+            this.micRegistered = true;
+          }
         } catch (error) {
           if (current()) {
             this.onError(error);
@@ -131,7 +140,7 @@ export class RTCConnection {
         await client.leave();
         return;
       }
-      await client.publish([this.local]);
+      this.joined = true;
     } catch (error) {
       if (current()) await this.destroy();
       else await client.leave();
@@ -139,8 +148,26 @@ export class RTCConnection {
     }
   }
   async microphone(enabled) {
-    if (!this.local) throw Error("RTC microphone unavailable");
-    await this.local.setEnabled(enabled);
+    if (!this.local || !this.client || !this.joined)
+      throw Error("RTC microphone unavailable");
+    if (enabled === this.micOn) return enabled;
+    if (enabled) {
+      await this.local.setEnabled(true);
+      if (!this.micRegistered) {
+        try {
+          await this.client.publish([this.local]);
+          this.micRegistered = true;
+        } catch (error) {
+          await this.local.setEnabled(false);
+          throw error;
+        }
+      }
+    } else {
+      // Agora automatically unpublishes and republishes a registered track
+      // when setEnabled changes. A disabled track cannot be passed to publish.
+      await this.local.setEnabled(false);
+    }
+    this.micOn = enabled;
     return enabled;
   }
   resumeOutput() {
@@ -169,6 +196,9 @@ export class RTCConnection {
       client = this.client;
     this.local = null;
     this.client = null;
+    this.joined = false;
+    this.micOn = false;
+    this.micRegistered = false;
     local?.stop();
     local?.close();
     if (client) await client.leave();

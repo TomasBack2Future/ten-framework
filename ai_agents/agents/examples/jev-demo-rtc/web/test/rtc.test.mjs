@@ -7,7 +7,11 @@ function setup() {
     handlers = {},
     errors = [];
   const local = {
-    setEnabled: async (on) => calls.push(["mic", on]),
+    enabled: true,
+    setEnabled: async (on) => {
+      local.enabled = on;
+      calls.push(["mic", on]);
+    },
     stop: () => calls.push(["local-stop"]),
     close: () => calls.push(["local-close"]),
   };
@@ -24,7 +28,11 @@ function setup() {
       assert.ok(handlers["user-published"]);
       calls.push(["join", ...args]);
     },
-    publish: async (tracks) => calls.push(["publish", tracks]),
+    publish: async (tracks) => {
+      if (tracks.some((track) => !track.enabled))
+        throw Error("TRACK_IS_DISABLED");
+      calls.push(["publish", tracks]);
+    },
     subscribe: async (...args) => calls.push(["subscribe", ...args]),
     renewToken: async (token) => calls.push(["renew", token]),
     leave: async () => calls.push(["leave"]),
@@ -54,6 +62,8 @@ test("joins matching identity, filters remote UID, publishes mic and renews toke
   const s = setup();
   await s.rtc.prepare();
   await s.rtc.join(credentials);
+  assert.equal(s.calls.filter((c) => c[0] === "publish").length, 0);
+  await s.rtc.microphone(true);
   assert.deepEqual(
     s.calls.find((c) => c[0] === "join"),
     ["join", "app", "channel", "token", 1001],
@@ -82,6 +92,30 @@ test("joins matching identity, filters remote UID, publishes mic and renews toke
     1001,
   ]);
   assert.equal(s.calls.filter((c) => c[0] === "publish").length, 2);
+});
+
+test("a disabled microphone is never published and mic toggles retain the registered track", async () => {
+  const s = setup();
+  await s.rtc.prepare();
+  assert.equal(s.local.enabled, false);
+  await s.rtc.join(credentials);
+  assert.equal(s.calls.filter((c) => c[0] === "publish").length, 0);
+  await s.rtc.microphone(true);
+  assert.equal(s.calls.filter((c) => c[0] === "publish").length, 1);
+  await s.rtc.microphone(false);
+  assert.equal(s.local.enabled, false);
+  await s.rtc.microphone(true);
+  assert.equal(s.local.enabled, true);
+  assert.equal(s.calls.filter((c) => c[0] === "publish").length, 1);
+});
+
+test("expired-token recovery leaves an off microphone unpublished", async () => {
+  const s = setup();
+  await s.rtc.prepare();
+  await s.rtc.join(credentials);
+  await s.handlers["token-privilege-did-expire"]();
+  assert.equal(s.calls.filter((c) => c[0] === "publish").length, 0);
+  assert.equal(s.local.enabled, false);
 });
 
 test("unpublish ends old track; next publish resumes; output mute waits for next reply", async () => {
@@ -160,6 +194,7 @@ test("expired-token recovery cannot rejoin after session cleanup", async () => {
   let release;
   await s.rtc.prepare();
   await s.rtc.join(credentials);
+  await s.rtc.microphone(true);
   s.rtc.fetchToken = () =>
     new Promise((resolve) => {
       release = resolve;
