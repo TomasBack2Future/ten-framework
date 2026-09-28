@@ -39,6 +39,28 @@ class PlayoutTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(c[0] == "audio" for c in self.calls), 2)
         self.assertTrue(all(c[2] == 320 for c in self.calls if c[0] == "audio"))
 
+    async def test_send_overhead_does_not_accumulate_into_frame_schedule(self):
+        async def slow_frame(rid, pcm):
+            self.calls.append(("audio", rid, len(pcm)))
+            self.now += 0.003
+
+        self.p.send_frame = slow_frame
+        await self.p.start("r1")
+        self.p.enqueue("r1", bytes(320 * 4))
+        for now in (0, 0.01, 0.02, 0.03):
+            self.now = now
+            await self.p.step()
+        self.assertEqual(sum(c[0] == "audio" for c in self.calls), 4)
+
+    async def test_late_scheduler_sends_only_one_frame_per_step(self):
+        await self.p.start("r1")
+        self.p.enqueue("r1", bytes(320 * 20))
+        self.now = 1
+        await self.p.step()
+        await self.p.step()
+        self.assertEqual(sum(c[0] == "audio" for c in self.calls), 1)
+        self.assertLessEqual(self.p.next_at, self.now + 0.005)
+
     async def test_flush_unpublish_then_next_reply_publish(self):
         await self.p.start("r1")
         self.p.enqueue("r1", bytes(1280))
