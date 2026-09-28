@@ -1,6 +1,6 @@
-# Jev demo over RTC — integration in progress
+# Jev demo over RTC
 
-An additional `jev-demo-rtc` service; the existing `jev-turn-control` WebSocket service, image, deployment and evidence volume are not modified. This integration is not yet accepted for deployment: dependency resolution, native extension contract checks, real channel audio and interruption acceptance remain required.
+An additional `jev-demo-rtc` service; the existing `jev-turn-control` WebSocket service, image, deployment and evidence volume are not modified. Native graph startup, browser audio, real interruption behavior and rollout are separate acceptance gates; see below.
 
 ## Architecture
 
@@ -16,7 +16,7 @@ The browser uses the same workflow UI assets, session controls and hidden unlimi
 4. A new reply explicitly publishes before its first 10 ms PCM frame. Old response PCM and delayed old stop requests cannot affect it.
 5. The browser handles `user-unpublished` and resubscribes after `user-published`; it does not hold a PCM buffer.
 
-The upstream demo proves use of `flush`, but does not by itself prove the installed extension's unpublish behavior. The public demo pins `agora_rtc =0.23.9-t1`; this version's command semantics and real Web SDK callbacks MUST be checked before release. A different locally cached `0.26.0-rc3` manifest exposes flush/publish/unpublish and `flush_by_unpub`, but is not evidence that the public pinned version has identical behavior. This integration does not guess a value for `flush_by_unpub`.
+The installed `agora_rtc =0.23.9-t1` manifest exposes `flush`, `publish`, and `unpublish` with an `audio` property. Its native libraries load and its graph connects to the RTC channel in a local container smoke test. The command sequence and browser tail behavior still need live audio acceptance; manifest and startup checks alone cannot prove that audio already in the network jitter buffer is silent.
 
 Server emission is not confirmed remote playback. RTC progress is explicitly `confirmed=false`, and uses a conservative server-emission estimate with a 250 ms allowance. It cannot mark a reply fully played. This allowance is a prototype estimate, not a measured network guarantee. Real interruption tests must quantify browser residual audio and ensure old audio cannot restart.
 
@@ -26,14 +26,12 @@ Use a Linux TEN runtime environment with network access. From this directory:
 
 ```sh
 task install
-# The first npm resolution must produce web/package-lock.json; review and commit
-# that lock before any release build. Later release builds use npm ci.
 export AGORA_APP_CERTIFICATE_FILE=/absolute/private/path/.secret/agora
 # Supply JEV_API_KEY, SONIOX_API_KEY, GROQ_API_KEY, CARTESIA_API_KEY server-side.
 python3 scripts/run_local.py
 ```
 
-`task install` and native runtime launch have NOT been verified in the restricted development environment. The RTC Web SDK and token-library pinned versions also require package resolution and signature verification.
+The locked npm dependencies install with `npm ci`. The Docker build uses the pinned WS runtime image and adds the RTC native extension; `scripts/start.sh` supplies the native Agora SDK library path. A local container reached the RTC control `ready` event with real server credentials and a session-specific channel.
 
 ## Validation
 
@@ -48,9 +46,9 @@ The offline tests cover pacing, old-response fencing, delayed flush vs new publi
 
 ## Independent deployment
 
-`deploy/demo.yaml` creates only `jev-demo-rtc` Deployment/Service/Ingress and `jev-demo-rtc-evidence` PVC in the existing namespace. Its hostname is `jev-demo-rtc.hipaa-poc.agoralab.co`, TLS secret is `jev-demo-rtc-tls`, and credential secret is `jev-demo-rtc-credentials`. These must be provisioned independently; no command should update the WS resources.
+`deploy/demo.yaml` creates only `jev-demo-rtc` Deployment/Service/Ingress and `jev-demo-rtc-evidence` PVC in the existing namespace. Its hostname is `jev-demo-rtc.hipaa-poc.agoralab.co`, TLS secret is `jev-demo-rtc-tls`, and credential secret is `jev-demo-rtc-agora` for the certificate; provider keys are read-only from the existing `jev-provider-keys` Secret. `deploy/acme.yaml` and `deploy/acme-auth.sh` provide a separate HTTP-01 challenge route for this host. These resources must be provisioned independently; no command should update the WS resources.
 
-Build `Dockerfile` with an immutable, known-good `WS_IMAGE` base and `REVISION`. This packages unchanged provider/runtime dependencies into a separate RTC image. The build deliberately refuses to proceed without a resolved lockfile. Resolve and verify the public RTC package, build on Linux, then deploy an immutable image digest only after:
+Build `Dockerfile` with an immutable, known-good `WS_IMAGE` base and `REVISION`. This packages unchanged provider/runtime dependencies into a separate RTC image. The build refuses to proceed without a resolved lockfile. The independent GitHub Actions workflow tests and publishes the RTC image on the feature branch. Deploy an immutable image digest only after:
 
 - Native graph starts and both identities join the expected isolated RTC channel.
 - Live microphone → ASR → Jev → LLM → RTC speech works over HTTPS.

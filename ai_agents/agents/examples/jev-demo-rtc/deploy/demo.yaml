@@ -34,7 +34,8 @@ spec:
         - {name: JEV_TRUST_PROXY, value: '1'}
         - {name: JEV_EVENT_LOG_DIR, value: /var/lib/jev-evidence}
         envFrom:
-        - secretRef: {name: jev-demo-rtc-credentials}
+        - secretRef: {name: jev-provider-keys}
+        - secretRef: {name: jev-demo-rtc-agora}
         resources:
           requests: {cpu: 100m, memory: 256Mi}
           limits: {cpu: '2', memory: 2Gi}

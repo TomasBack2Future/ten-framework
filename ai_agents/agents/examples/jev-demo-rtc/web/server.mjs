@@ -7,7 +7,8 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { WebSocketServer, WebSocket } from "ws";
-import { RtcTokenBuilder, RtcRole } from "agora-token";
+import agoraToken from "agora-token";
+const { RtcTokenBuilder, RtcRole } = agoraToken;
 const appId = process.env.AGORA_APP_ID || "518383bde9d44172961da1595e982189";
 process.env.AGORA_APP_ID = appId;
 if (!process.env.AGORA_APP_CERTIFICATE)

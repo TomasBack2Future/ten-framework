@@ -1,5 +1,5 @@
 # Build separately from the WS image. The base image is pinned by the deployer.
-ARG WS_IMAGE
+ARG WS_IMAGE=ghcr.io/tomasback2future/jev-turn-control@sha256:7a29162974c43ec2cf468b129f37e6aff5bc2d0d1a5b8ffbc759a715a555e4a1
 FROM ${WS_IMAGE} AS build
 USER root
 COPY .bootstrap/tools/ten_manager/ /opt/ten_manager/
