@@ -384,6 +384,51 @@ def test_final_and_punctuation_alone_do_not_grant_floor():
     assert not engine.active
 
 
+def test_punctuation_only_asr_cannot_stop_or_start_a_response():
+    engine = make()
+    engine.input("——", True, 0, "artifact")
+    assert not engine.pending
+    assert engine.begin_decision(120) is None
+    assert engine.events[-1]["type"] == "asr.ignored"
+
+    rid = start(engine)
+    current_revision = engine.revision
+    engine.input("——", True, 500, "artifact2")
+    assert engine.active == rid
+    assert engine.revision == current_revision
+    assert engine.begin_decision(700) is None
+    assert not any(
+        action["type"] == "response.cancel" for action in engine.drain_actions()
+    )
+
+
+def test_punctuation_only_segment_does_not_replace_real_pending_input():
+    engine = make()
+    engine.input("Please explain", False, 0, "speech")
+    current_revision = engine.revision
+    engine.input("——", True, 100, "artifact")
+    assert engine.pending
+    assert engine.text == "Please explain"
+    assert engine.revision == current_revision
+    request = engine.begin_decision(120)
+    assert request["state"]["input_text"] == "Please explain"
+
+
+def test_nonfinal_clarification_waits_for_missing_referent():
+    engine = make()
+    engine.input("我问你解释一下，你刚刚那个", False, 0, "speech")
+    request = engine.begin_decision(120)
+    engine.complete_decision(request, {"start": answer("clarify")}, 200)
+    assert engine.timer["label"] == "continuation"
+    assert not engine.active
+
+    engine.input("我问你解释一下，你刚刚那个笑话。", True, 400, "speech")
+    request = engine.begin_decision(520)
+    engine.complete_decision(request, {"start": answer("answer")}, 600)
+    engine.tick(850)
+    assert engine.responses[engine.active]["mode"] == "answer"
+
+
 def test_latest_input_cancels_short_answer_and_continuation_deadlines():
     engine = make(scheduling={"max_wait_ms": 1000})
     engine.input("I will go to", False, 0)
