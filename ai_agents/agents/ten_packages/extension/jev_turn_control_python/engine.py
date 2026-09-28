@@ -159,6 +159,19 @@ class TurnEngine:
             return
         self.now = now
         text = " ".join(text[:12000].split())
+        if not any(character.isalnum() for character in text):
+            # ASR sometimes emits a standalone dash/punctuation segment. It
+            # carries no speech intent and must neither stop the current
+            # response nor start a clarification from that artifact.
+            self.emit(
+                "asr.ignored",
+                {
+                    "text": text,
+                    "segment_id": segment_id,
+                    "reason": "punctuation_only",
+                },
+            )
+            return
         # A repeated final for the partial already used to answer is not a new turn.
         if segment_id == self.consumed_segment and self.same_transcript(
             text, self.consumed_text
@@ -446,6 +459,12 @@ class TurnEngine:
             "score_mode"
         ] == "answer_plus_clarify" and label in ("answer", "clarify"):
             score = reply_score
+        deferred_clarify = label == "clarify" and not self.final
+        if deferred_clarify:
+            # Clarification is a response to a completed, ambiguous request.
+            # A live prefix may still supply its missing referent, so keep the
+            # existing bounded continuation timer instead of asking early.
+            label = "continuation"
         if (
             self.wait_hold
             and not request["state"].get("wait_recheck")
@@ -492,6 +511,7 @@ class TurnEngine:
             not self.active
             and not self.stopping
             and not self.wait_hold
+            and not deferred_clarify
             and label == "continuation"
             and bc.get("label") == "backchannel"
             and bc.get("score", 0) >= self.config["backchannel"]["threshold"]
