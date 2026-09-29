@@ -63,6 +63,12 @@ or stop acknowledgment is active. Stop threshold .65 (tuned SD .49). A backchann
 600 ms is intentionally dropped even if the provider succeeds within its 800 ms
 timeout: a late acknowledgment should not interrupt a newly developing thought.
 
+The tuned Jev stop question favors yielding when the user clearly initiates a new
+topic, task, or complete request addressed to the assistant. It keeps short
+acknowledgments, requests to another person, and unfinished ASR prefixes from
+claiming the assistant's floor. This changes the question and criteria, not the
+stop threshold or the independent backchannel decision.
+
 Observation enabled, include_text false, buffer_limit 256 (range 16–4096).
 Text fields are redacted by default. `state.snapshot` reconstructs UI state and
 must NEVER replay actions. Relative times use server monotonic elapsed ms.
