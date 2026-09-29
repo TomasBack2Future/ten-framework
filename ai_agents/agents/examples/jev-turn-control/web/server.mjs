@@ -266,7 +266,7 @@ const server = http.createServer(async (req, res) => {
         const choices = {
           "provider.name": ["jev", "sd", "sd_jev"],
           "provider.profile": ["baseline", "tuned"],
-          "voice.language": ["en", "ja"],
+          "voice.language": ["en", "ja", "ko"],
         };
         const limits = {
           "compression.trigger_chars": [1000, 24000],

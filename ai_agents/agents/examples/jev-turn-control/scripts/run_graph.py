@@ -42,7 +42,7 @@ def graph_for(mode, overrides):
             raise ValueError("invalid decision mode")
         if key == "provider.profile" and value not in ("baseline", "tuned"):
             raise ValueError("invalid decision profile")
-        if key == "voice.language" and value not in ("en", "ja"):
+        if key == "voice.language" and value not in ("en", "ja", "ko"):
             raise ValueError("invalid voice language")
         if key.endswith(".enabled") and not isinstance(value, bool):
             raise ValueError("boolean required")
@@ -72,6 +72,11 @@ def graph_for(mode, overrides):
     if mode == "mock":
         config["provider"]["name"] = "mock"
     language = config.get("voice", {}).get("language", "en")
+    voice_id = {
+        "en": "${env:CARTESIA_VOICE_ID|a0e99841-438c-4a64-b679-ae501e7d6091}",
+        "ja": "861213b7-f057-45c8-9527-0f4c144f1a03",
+        "ko": "90dba946-774b-40ed-98d9-ac3835117827",
+    }[language]
     graph = {
         "nodes": [
             {
@@ -156,11 +161,7 @@ def graph_for(mode, overrides):
                         "model_id": "${env:CARTESIA_MODEL|sonic-3}",
                         "voice": {
                             "mode": "id",
-                            "id": (
-                                "7ca2afba-a719-4f06-9af2-ea2b8e3cf14c"
-                                if language == "ja"
-                                else "${env:CARTESIA_VOICE_ID|a0e99841-438c-4a64-b679-ae501e7d6091}"
-                            ),
+                            "id": voice_id,
                         },
                         "language": language,
                     },
