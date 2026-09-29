@@ -102,9 +102,11 @@ for (const failure of ["unlock", "busy", "initialize", "cleanup"]) {
     });
     await import(`../public/app.js?failure=${failure}`);
     await new Promise((resolve) => setImmediate(resolve));
+    get("voice-language").value = "ja";
     await get("connect").onclick();
     assert.equal(get("connect").disabled, false);
     assert.equal(get("voice-prompt").disabled, false);
+    assert.equal(get("voice-language").disabled, false);
     assert.equal(get("mic").disabled, true);
     assert.equal(closed, 1);
     const cleanup = requests.filter((x) => x.path === "/api/end");
@@ -127,6 +129,13 @@ for (const failure of ["unlock", "busy", "initialize", "cleanup"]) {
     await get("connect").onclick();
     assert.equal(get("connect").disabled, true);
     assert.equal(get("voice-prompt").disabled, true);
+    assert.equal(get("voice-language").disabled, true);
+    assert.equal(
+      requests.find((x) => x.path === "/api/session").body.settings[
+        "voice.language"
+      ],
+      "ja",
+    );
     if (failure === "cleanup")
       assert.equal(requests[retryStart].path, "/api/end");
     listeners.pagehide();

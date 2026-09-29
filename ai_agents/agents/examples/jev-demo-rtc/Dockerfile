@@ -3,6 +3,11 @@ ARG WS_IMAGE=ghcr.io/tomasback2future/jev-turn-control@sha256:7a29162974c43ec2cf
 FROM ${WS_IMAGE} AS build
 USER root
 COPY .bootstrap/tools/ten_manager/ /opt/ten_manager/
+COPY ai_agents/agents/examples/jev-turn-control/scripts/run_graph.py /workspace/ai_agents/agents/examples/jev-turn-control/scripts/run_graph.py
+COPY ai_agents/agents/examples/jev-turn-control/web/public/index.html /workspace/ai_agents/agents/examples/jev-turn-control/web/public/index.html
+COPY ai_agents/agents/examples/jev-turn-control/web/public/style.css /workspace/ai_agents/agents/examples/jev-turn-control/web/public/style.css
+COPY ai_agents/agents/ten_packages/extension/jev_turn_control_python/config.py /workspace/ai_agents/agents/ten_packages/extension/jev_turn_control_python/config.py
+COPY ai_agents/agents/ten_packages/extension/jev_turn_control_python/memory.py /workspace/ai_agents/agents/ten_packages/extension/jev_turn_control_python/memory.py
 COPY ai_agents/agents/examples/jev-demo-rtc/ /workspace/ai_agents/agents/examples/jev-demo-rtc/
 ENV TMAN=/opt/ten_manager/bin/tman
 WORKDIR /workspace/ai_agents/agents/examples/jev-demo-rtc

@@ -7,7 +7,7 @@ from .profiles import profile_for, validate_criteria
 
 DEFAULTS = {
     "executor": {"enabled": False},
-    "voice": {"prompt": ""},
+    "voice": {"prompt": "", "language": "en"},
     "compression": {
         "enabled": False,
         "prompt": "",
@@ -148,6 +148,10 @@ class Config:
                 if key == "prompt" and not value:
                     continue
                 values[section][key] = deepcopy(value)
+        if values["voice"]["language"] == "ja" and "phrases" not in raw.get(
+            "backchannel", {}
+        ):
+            values["backchannel"]["phrases"] = ["うん。", "なるほど。"]
         cfg = cls(values)
         cfg.validate()
         return cfg
@@ -156,6 +160,8 @@ class Config:
         return self.values[key]
 
     def validate(self):
+        if self["voice"]["language"] not in ("en", "ja"):
+            raise ValueError("invalid voice language")
         for section, options in self.values.items():
             for key, value in options.items():
                 if key.endswith("_ms") and not 0 <= value <= 60000:

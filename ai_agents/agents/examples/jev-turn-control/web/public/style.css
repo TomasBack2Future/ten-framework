@@ -138,10 +138,34 @@ main {
   gap: 18px;
   padding: 0 30px 16px;
 }
+.intro-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
 .intro h1 {
   font-size: clamp(20px, 2.15vw, 31px);
   margin: 4px 0 5px;
   letter-spacing: -0.9px;
+}
+.language-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #657284;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.language-picker select {
+  padding: 6px 25px 6px 9px;
+  color: #112138;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.language-picker select:disabled {
+  opacity: 0.6;
 }
 .intro p {
   margin: 0;
@@ -794,6 +818,13 @@ th {
   }
   .intro h1 {
     font-size: 23px;
+  }
+  .language-picker {
+    font-size: 11px;
+  }
+  .language-picker select {
+    max-width: 86px;
+    padding: 5px;
   }
   .intro p {
     font-size: 11px;

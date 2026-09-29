@@ -47,3 +47,15 @@ class GraphTests(unittest.TestCase):
                 module.graph_for({}, session, 8766)
         with self.assertRaises(ValueError):
             module.graph_for({"transport.enabled": False}, "a" * 32, 8766)
+
+    def test_japanese_session_uses_japanese_tts_and_controller_language(self):
+        graph = module.graph_for({"voice.language": "ja"}, "a" * 32, 8766)[
+            "ten"
+        ]["predefined_graphs"][0]["graph"]
+        nodes = {node["name"]: node["property"] for node in graph["nodes"]}
+        self.assertEqual(nodes["tts"]["params"]["language"], "ja")
+        self.assertEqual(
+            nodes["tts"]["params"]["voice"]["id"],
+            "7ca2afba-a719-4f06-9af2-ea2b8e3cf14c",
+        )
+        self.assertEqual(nodes["turn_control"]["voice"]["language"], "ja")

@@ -1,5 +1,6 @@
 """Exercise RTC feedback against the real, unchanged Jev reducer."""
 
+import importlib
 import importlib.util
 from pathlib import Path
 import sys
@@ -25,6 +26,24 @@ for name in ("config", "engine"):
     spec.loader.exec_module(loaded)
 Config = sys.modules[f"{PACKAGE}.config"].Config
 TurnEngine = sys.modules[f"{PACKAGE}.engine"].TurnEngine
+
+
+class SessionLanguageTests(unittest.TestCase):
+    @unittest.skipUnless(importlib.util.find_spec("aiohttp"), "runtime only")
+    def test_japanese_voice_prompt_and_backchannel_in_runtime_package(self):
+        memory = importlib.import_module(f"{PACKAGE}.memory")
+        config = Config.load({"voice": {"language": "ja"}})
+        self.assertEqual(config["backchannel"]["phrases"][0], "うん。")
+        request = memory.voice_request(
+            {
+                "response_id": "test",
+                "mode": "answer",
+                "context": [],
+                "input_text": "What happens next?",
+            },
+            config,
+        )
+        self.assertIn("Session response language: Japanese", request["prompt"])
 
 
 class ReducerTransportTests(unittest.IsolatedAsyncioTestCase):

@@ -5,7 +5,7 @@ import os
 
 import aiohttp
 
-VOICE_PROMPT = """You are the voice assistant in the TEN Jev demo. Reply in the user's language,
+VOICE_PROMPT = """You are the voice assistant in the TEN Jev demo. Reply in the selected session language,
 in one or two short conversational sentences. Ask at most one question per reply;
 avoid Markdown lists. Use the supplied conversation
 memory to remember names, preferences, constraints and unfinished requests. Ask a
@@ -39,6 +39,12 @@ def voice_request(action, config, executor_state=None):
     """The official adapter prepends request.prompt exactly once."""
     executor_state = action.get("executor_state") or executor_state
     prompt = config["voice"]["prompt"] or VOICE_PROMPT
+    language = {"en": "English", "ja": "Japanese"}[config["voice"]["language"]]
+    prompt += (
+        f"\nSession response language: {language}. Prefer {language} for spoken replies "
+        "regardless of the input language, so the configured voice can synthesize "
+        "them. Preserve names and quoted terms when useful."
+    )
     prompt += (
         "\nDecision provider: "
         + {
