@@ -238,15 +238,16 @@ def test_failure_policy_and_ignore():
 
 
 def test_final_question_provider_failure_uses_answer_timer():
-    engine = make()
-    engine.input("Can you tell me another one?", True, 0)
-    request = engine.begin_decision(120)
-    engine.complete_decision(request, {}, 920, error=True)
-    assert engine.timer["label"] == "answer"
-    engine.tick(1169)
-    assert not engine.active
-    engine.tick(1170)
-    assert engine.responses[engine.active]["mode"] == "answer"
+    for provider in ("jev", "sd", "sd_jev"):
+        engine = make(provider={"name": provider})
+        engine.input("Can you tell me another one?", True, 0)
+        request = engine.begin_decision(120)
+        engine.complete_decision(request, {}, 920, error=True)
+        assert engine.timer["label"] == "answer"
+        engine.tick(1169)
+        assert not engine.active
+        engine.tick(1170)
+        assert engine.responses[engine.active]["mode"] == "answer"
 
 
 def test_question_timeout_does_not_override_wait_or_nonfinal():
