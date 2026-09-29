@@ -237,6 +237,42 @@ def test_failure_policy_and_ignore():
     assert not engine.active
 
 
+def test_final_question_provider_failure_uses_answer_timer():
+    engine = make()
+    engine.input("Can you tell me another one?", True, 0)
+    request = engine.begin_decision(120)
+    engine.complete_decision(request, {}, 920, error=True)
+    assert engine.timer["label"] == "answer"
+    engine.tick(1169)
+    assert not engine.active
+    engine.tick(1170)
+    assert engine.responses[engine.active]["mode"] == "answer"
+
+
+def test_question_timeout_does_not_override_wait_or_nonfinal():
+    for text, final in (
+        ("Can you wait a moment?", True),
+        ("等我说完好吗？", True),
+        ("Can you tell me another one?", False),
+    ):
+        engine = make()
+        engine.input(text, final, 0)
+        request = engine.begin_decision(120)
+        engine.complete_decision(request, {}, 920, error=True)
+        assert engine.timer is None
+        engine.tick(4999)
+        assert not engine.active
+
+
+def test_question_timeout_respects_hold_failure_policy():
+    engine = make(provider={"failure_policy": "hold"})
+    engine.input("Can you tell me another one?", True, 0)
+    request = engine.begin_decision(120)
+    engine.complete_decision(request, {}, 920, error=True)
+    engine.tick(5000)
+    assert not engine.active
+
+
 def test_config_invalid_values_and_text_redaction():
     import pytest
 
