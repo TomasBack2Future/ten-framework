@@ -30,20 +30,27 @@ TurnEngine = sys.modules[f"{PACKAGE}.engine"].TurnEngine
 
 class SessionLanguageTests(unittest.TestCase):
     @unittest.skipUnless(importlib.util.find_spec("aiohttp"), "runtime only")
-    def test_japanese_voice_prompt_and_backchannel_in_runtime_package(self):
+    def test_voice_prompt_and_backchannel_in_runtime_package(self):
         memory = importlib.import_module(f"{PACKAGE}.memory")
-        config = Config.load({"voice": {"language": "ja"}})
-        self.assertEqual(config["backchannel"]["phrases"][0], "うん。")
-        request = memory.voice_request(
-            {
-                "response_id": "test",
-                "mode": "answer",
-                "context": [],
-                "input_text": "What happens next?",
-            },
-            config,
-        )
-        self.assertIn("Session response language: Japanese", request["prompt"])
+        for code, name, phrase in (
+            ("ja", "Japanese", "うん。"),
+            ("ko", "Korean", "네."),
+        ):
+            with self.subTest(language=code):
+                config = Config.load({"voice": {"language": code}})
+                self.assertEqual(config["backchannel"]["phrases"][0], phrase)
+                request = memory.voice_request(
+                    {
+                        "response_id": "test",
+                        "mode": "answer",
+                        "context": [],
+                        "input_text": "What happens next?",
+                    },
+                    config,
+                )
+                self.assertIn(
+                    f"Session response language: {name}", request["prompt"]
+                )
 
 
 class ReducerTransportTests(unittest.IsolatedAsyncioTestCase):

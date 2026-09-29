@@ -39,7 +39,9 @@ def voice_request(action, config, executor_state=None):
     """The official adapter prepends request.prompt exactly once."""
     executor_state = action.get("executor_state") or executor_state
     prompt = config["voice"]["prompt"] or VOICE_PROMPT
-    language = {"en": "English", "ja": "Japanese"}[config["voice"]["language"]]
+    language = {"en": "English", "ja": "Japanese", "ko": "Korean"}[
+        config["voice"]["language"]
+    ]
     prompt += (
         f"\nSession response language: {language}. Prefer {language} for spoken replies "
         "regardless of the input language, so the configured voice can synthesize "

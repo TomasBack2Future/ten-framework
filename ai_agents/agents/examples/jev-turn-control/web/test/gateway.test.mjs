@@ -41,7 +41,11 @@ async function gateway(t, env = {}) {
   };
 }
 test("anonymous concurrent sessions have isolated events and cleanup; origin/settings validation remains", async (t) => {
-  const { post, connect } = await gateway(t);
+  const { origin, post, connect } = await gateway(t);
+  assert.match(
+    await (await fetch(origin)).text(),
+    /<option value="ko">한국어<\/option>/,
+  );
   assert.equal((await post("/api/login", { code: "anything" })).status, 404);
   assert.equal(
     (await post("/api/session", {}, "https://other.test")).status,
@@ -61,6 +65,10 @@ test("anonymous concurrent sessions have isolated events and cleanup; origin/set
     await post("/api/session", { settings: { "voice.language": "ja" } })
   ).json();
   await post("/api/end", { session_id: japanese.id });
+  const korean = await (
+    await post("/api/session", { settings: { "voice.language": "ko" } })
+  ).json();
+  await post("/api/end", { session_id: korean.id });
   const result = await Promise.all([
     post("/api/session"),
     post("/api/session"),

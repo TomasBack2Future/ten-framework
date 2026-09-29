@@ -22,20 +22,29 @@ def node_property(graph, name):
     return next(node["property"] for node in nodes if node["name"] == name)
 
 
-def test_english_keeps_existing_voice_and_japanese_selects_its_own():
+@pytest.mark.parametrize(
+    ("language", "voice_id"),
+    [
+        ("ja", "861213b7-f057-45c8-9527-0f4c144f1a03"),
+        ("ko", "90dba946-774b-40ed-98d9-ac3835117827"),
+    ],
+)
+def test_english_keeps_existing_voice_and_other_languages_select_their_own(
+    language, voice_id
+):
     english = graph_module.graph_for("live", {})
-    japanese = graph_module.graph_for("live", {"voice.language": "ja"})
+    selected = graph_module.graph_for("live", {"voice.language": language})
     assert node_property(english, "tts")["params"]["language"] == "en"
     assert node_property(english, "tts")["params"]["voice"]["id"].startswith(
         "${env:CARTESIA_VOICE_ID|"
     )
-    assert node_property(japanese, "tts")["params"] == {
+    assert node_property(selected, "tts")["params"] == {
         **node_property(english, "tts")["params"],
-        "voice": {"mode": "id", "id": "7ca2afba-a719-4f06-9af2-ea2b8e3cf14c"},
-        "language": "ja",
+        "voice": {"mode": "id", "id": voice_id},
+        "language": language,
     }
-    assert node_property(japanese, "turn_control")["voice"]["language"] == "ja"
-    assert node_property(japanese, "stt") == node_property(english, "stt")
+    assert node_property(selected, "turn_control")["voice"]["language"] == language
+    assert node_property(selected, "stt") == node_property(english, "stt")
 
 
 def test_unsupported_language_is_rejected_in_graph_and_controller():
@@ -58,6 +67,10 @@ def test_selected_language_reaches_voice_prompt_even_with_override():
     assert "Be brief." in japanese_request["prompt"]
     assert "Session response language: Japanese" in japanese_request["prompt"]
     assert "regardless of the input language" in japanese_request["prompt"]
+    korean = Config.load({"voice": {"language": "ko", "prompt": "Be brief."}})
+    assert "Session response language: Korean" in memory.voice_request(
+        action, korean
+    )["prompt"]
     english_request = memory.voice_request(action, Config.load())
     assert "Session response language: English" in english_request["prompt"]
 
@@ -67,4 +80,8 @@ def test_backchannel_uses_selected_language():
     assert Config.load({"voice": {"language": "ja"}})["backchannel"]["phrases"] == [
         "うん。",
         "なるほど。",
+    ]
+    assert Config.load({"voice": {"language": "ko"}})["backchannel"]["phrases"] == [
+        "네.",
+        "그렇군요.",
     ]

@@ -118,12 +118,14 @@ have a current continue judgment do not trigger this fallback.
 
 ## Conversation memory and voice prompt
 
-The session-start `voice.language` setting accepts `en` (default) or `ja` in
-both the WebSocket and RTC demos. English keeps the configured
+The session-start `voice.language` setting accepts `en` (default), `ja`, or
+`ko` in both the WebSocket and RTC demos. English keeps the configured
 `CARTESIA_VOICE_ID`; Japanese selects Cartesia voice
-`7ca2afba-a719-4f06-9af2-ea2b8e3cf14c` and sets the TTS language to `ja`.
+`861213b7-f057-45c8-9527-0f4c144f1a03` with TTS language `ja`, and Korean
+selects voice `90dba946-774b-40ed-98d9-ac3835117827` with language `ko`.
 Soniox remains multilingual. The language is fixed for a session; choose it
-before starting a new call. Japanese also selects Japanese backchannel phrases.
+before starting a new call. Japanese and Korean also select backchannel phrases
+in the chosen language.
 
 `voice.prompt` overrides the default voice assistant prompt (max 2000 characters).
 The default describes the actual TEN → Soniox → Jev turn decisions → Groq →

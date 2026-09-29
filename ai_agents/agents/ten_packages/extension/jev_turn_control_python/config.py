@@ -148,10 +148,14 @@ class Config:
                 if key == "prompt" and not value:
                     continue
                 values[section][key] = deepcopy(value)
-        if values["voice"]["language"] == "ja" and "phrases" not in raw.get(
-            "backchannel", {}
-        ):
-            values["backchannel"]["phrases"] = ["うん。", "なるほど。"]
+        localized_phrases = {
+            "ja": ["うん。", "なるほど。"],
+            "ko": ["네.", "그렇군요."],
+        }
+        if "phrases" not in raw.get("backchannel", {}):
+            language = values["voice"]["language"]
+            if language in localized_phrases:
+                values["backchannel"]["phrases"] = localized_phrases[language]
         cfg = cls(values)
         cfg.validate()
         return cfg
@@ -160,7 +164,7 @@ class Config:
         return self.values[key]
 
     def validate(self):
-        if self["voice"]["language"] not in ("en", "ja"):
+        if self["voice"]["language"] not in ("en", "ja", "ko"):
             raise ValueError("invalid voice language")
         for section, options in self.values.items():
             for key, value in options.items():
