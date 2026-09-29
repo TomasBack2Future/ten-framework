@@ -1,7 +1,7 @@
 name: Jev demo RTC
 on:
   push:
-    branches: [feat/jev-demo-rtc]
+    branches: [feat/jev-demo-rtc, chore/jev-oss-bootstrap]
     paths: ['ai_agents/agents/examples/jev-demo-rtc/**', '.github/workflows/jev-demo-rtc.yml']
   pull_request:
     paths: ['ai_agents/agents/examples/jev-demo-rtc/**', '.github/workflows/jev-demo-rtc.yml']
