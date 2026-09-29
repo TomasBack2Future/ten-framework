@@ -1,0 +1,1 @@
+Dedicated non-serving benchmark Pod deleted and absence verified. No serving deployment changed.

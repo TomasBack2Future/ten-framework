@@ -9,7 +9,6 @@ import threading
 import sys
 from pathlib import Path
 
-
 SECRET_FIELD = re.compile(
     r"(?:api[_-]?key|authorization|cookie|password|secret|access[_-]?token|"
     r"refresh[_-]?token|access[_-]?code|^token$|[_-]token$|[_-]key$|certificate)",

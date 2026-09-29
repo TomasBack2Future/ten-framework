@@ -1,0 +1,50 @@
+{
+  "reason": "local-to-kubernetes exec transport connection reset, not provider error",
+  "captured_before_disconnect": 3243,
+  "original_sha256": "710f25aa72f04154090ba32ce0397a240a348627a519b0a98a14c8f0cc3d3b5f",
+  "missing_arms": 13,
+  "affected_lanes": [
+    "shipped_profile"
+  ],
+  "unrecorded_calls": "unknown; at most the missing suffix arms/stages may have executed without captured output; no successful-primary result discarded or replaced",
+  "jobs": [
+    {
+      "id": "profile/response/fdb-backchannel-40/stop",
+      "arms": [
+        "jev"
+      ]
+    },
+    {
+      "id": "profile/response/fdb-backchannel-55/790/120/A/start",
+      "arms": [
+        "sd_jev",
+        "jev",
+        "sd"
+      ]
+    },
+    {
+      "id": "profile/response/fdb-backchannel-55/stop",
+      "arms": [
+        "jev",
+        "sd",
+        "sd_jev"
+      ]
+    },
+    {
+      "id": "profile/response/fdb-backchannel-58/1161/120/A/start",
+      "arms": [
+        "sd",
+        "sd_jev",
+        "jev"
+      ]
+    },
+    {
+      "id": "profile/response/fdb-backchannel-58/stop",
+      "arms": [
+        "sd_jev",
+        "jev",
+        "sd"
+      ]
+    }
+  ]
+}

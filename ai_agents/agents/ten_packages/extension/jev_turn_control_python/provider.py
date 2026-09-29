@@ -166,6 +166,7 @@ class DecisionProvider:
                 cfg["sd_endpoint"],
                 {
                     "model": "classify-1",
+                    "reasoning": False,
                     "state": {"text": canonical_json(state)},
                     "questions": questions,
                 },

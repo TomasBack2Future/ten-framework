@@ -1,0 +1,8 @@
+{
+  "paired_results": 3256,
+  "captured_http_stages": 4109,
+  "missing_or_duplicate_results": 0,
+  "wire_bodies_and_reasoning_flags_verified": true,
+  "full_chain_timing_verified": true,
+  "network_calls": 0
+}
