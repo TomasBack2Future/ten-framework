@@ -78,6 +78,9 @@ function detail(e) {
     p.duration_ms !== undefined ? `${p.duration_ms} ms` : "",
     p.applied !== undefined ? `applied ${p.applied}` : "",
     p.discard_reason,
+    p.code,
+    p.message,
+    p.recoverable === true ? "recoverable" : "",
     p.reason,
     p.timer_kind,
     p.delay_ms !== undefined ? `delay ${p.delay_ms} ms` : "",
@@ -150,6 +153,7 @@ function apply(e) {
     $("transcript").textContent = p.text || "";
   }
   if (e.type === "response.started") {
+    $("error").textContent = "";
     player.begin(e.response_id);
   }
   if (e.type === "context.capacity")
@@ -166,7 +170,8 @@ function apply(e) {
   if (e.type.startsWith("playback.") && p.heard_text !== undefined)
     $("heard").textContent =
       `${p.heard_text || "(none)"} · ${p.played_ms} ms · ${p.precision || "estimated"} · ${p.confirmed ? "confirmed cursor" : "unconfirmed"}`;
-  if (e.type === "error") fail(p.message || p.reason || "Agent error");
+  if (e.type === "error" && p.recoverable !== true)
+    fail(p.message || p.reason || "Agent error");
 }
 function openSocket() {
   socket = new WebSocket(

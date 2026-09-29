@@ -1,10 +1,16 @@
 name: Jev demo RTC
 on:
   push:
-    branches: [feat/jev-demo-rtc]
-    paths: ['ai_agents/agents/examples/jev-demo-rtc/**', '.github/workflows/jev-demo-rtc.yml']
+    branches: [feat/jev-demo-rtc, chore/jev-oss-bootstrap]
+    paths:
+      - 'ai_agents/agents/examples/jev-demo-rtc/**'
+      - 'ai_agents/agents/ten_packages/extension/jev_turn_control_python/**'
+      - '.github/workflows/jev-demo-rtc.yml'
   pull_request:
-    paths: ['ai_agents/agents/examples/jev-demo-rtc/**', '.github/workflows/jev-demo-rtc.yml']
+    paths:
+      - 'ai_agents/agents/examples/jev-demo-rtc/**'
+      - 'ai_agents/agents/ten_packages/extension/jev_turn_control_python/**'
+      - '.github/workflows/jev-demo-rtc.yml'
 permissions:
   contents: read
 jobs:

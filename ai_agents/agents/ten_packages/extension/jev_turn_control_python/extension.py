@@ -42,6 +42,7 @@ class JevTurnControlExtension(AsyncExtension):
         self.started = 0
         self.last_sent = 0
         self.tasks = set()
+        self.classification_task = None
         self.generation = None
         self.pump_lock = asyncio.Lock()
         self.asr_segment = 0
@@ -101,7 +102,7 @@ class JevTurnControlExtension(AsyncExtension):
             request = self.engine.begin_decision(self.now())
             if request:
                 request["response_id"] = self.engine.active
-                self.spawn(self.classify(request))
+                self.classification_task = self.spawn(self.classify(request))
             compression = self.engine.begin_compression(self.now())
             if compression:
                 self.spawn(self.compress(compression))
@@ -130,6 +131,19 @@ class JevTurnControlExtension(AsyncExtension):
             self.engine.start("executor_result", executor_state=state)
             if self.engine.active:
                 self.executor_notified = state["version"]
+
+    def retire_stale_decision(self):
+        """Let a new ASR revision use the slot held by an obsolete start call."""
+        request = self.engine.inflight
+        if (
+            request is None
+            or request["revision"] == self.engine.revision
+            or request["state"]["assistant_speaking"]
+        ):
+            return
+        if self.classification_task and not self.classification_task.done():
+            self.classification_task.cancel()
+        self.engine.complete_decision(request, {}, self.now())
 
     async def classify(self, request):
         self.record("decision.request", request, request.get("response_id"))
@@ -548,6 +562,7 @@ class JevTurnControlExtension(AsyncExtension):
                         self.asr_final_end = end_ms
             segment = payload.get("segment_id", f"asr-{self.asr_segment}")
             self.engine.input(text, final, now, segment)
+            self.retire_stale_decision()
             if final and self.executor and not self.engine.closed:
                 self.executor.submit(
                     self.engine.revision, text, self.engine.history

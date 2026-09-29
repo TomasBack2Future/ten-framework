@@ -3,6 +3,7 @@
 from collections import deque
 from copy import deepcopy
 import math
+import re
 
 from .config import Config
 
@@ -153,6 +154,20 @@ class TurnEngine:
             return text
 
         return normalized(left) == normalized(right)
+
+    def final_direct_question(self):
+        """Conservative fallback only when the decision provider is unavailable."""
+        text = self.text.strip().casefold()
+        if not self.final or not text.endswith(("?", "？")):
+            return False
+        # A request to hold the floor may itself be phrased as a question.
+        return not re.match(
+            r"^(?:(?:please\s+)?(?:wait|hold on|let me finish|don't answer yet)\b"
+            r"|(?:can|could|would|will)\s+you\s+(?:please\s+)?"
+            r"(?:wait|hold on|let me finish)\b"
+            r"|(?:等一下|稍等|先别|让我说完|等我说完))",
+            text,
+        )
 
     def input(self, text, final, now, segment_id="default"):
         if self.closed or not text.strip():
@@ -416,6 +431,18 @@ class TurnEngine:
             self.emit(
                 "error", {"code": "provider_unavailable", "recoverable": True}
             )
+            if (
+                self.config["provider"]["failure_policy"] == "bounded_wait"
+                and "start" in request["kinds"]
+                and not request["state"]["assistant_speaking"]
+                and not self.wait_hold
+                and self.final_direct_question()
+            ):
+                self.schedule("answer")
+                self.emit(
+                    "decision.fallback",
+                    {"reason": "provider_unavailable_final_question"},
+                )
             return
         if "stop" in request["kinds"]:
             self.stop_pending_since = None
