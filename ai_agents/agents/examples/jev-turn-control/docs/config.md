@@ -118,10 +118,19 @@ have a current continue judgment do not trigger this fallback.
 
 ## Conversation memory and voice prompt
 
+The session-start `voice.language` setting accepts `en` (default) or `ja` in
+both the WebSocket and RTC demos. English keeps the configured
+`CARTESIA_VOICE_ID`; Japanese selects Cartesia voice
+`7ca2afba-a719-4f06-9af2-ea2b8e3cf14c` and sets the TTS language to `ja`.
+Soniox remains multilingual. The language is fixed for a session; choose it
+before starting a new call. Japanese also selects Japanese backchannel phrases.
+
 `voice.prompt` overrides the default voice assistant prompt (max 2000 characters).
 The default describes the actual TEN → Soniox → Jev turn decisions → Groq →
-Cartesia path, answers briefly in the user's language, asks at most one question,
+Cartesia path, answers briefly in the chosen session language, asks at most one question,
 and explicitly has no search, booking, filesystem or executor capability.
+The session language instruction is appended even when `voice.prompt` is overridden,
+so the prompt and configured TTS voice stay aligned.
 The official OpenAI-compatible adapter receives one `request.prompt` system message,
 followed by all retained user/assistant messages and the current user input.
 `context.request` records message counts/revision, never an API key.

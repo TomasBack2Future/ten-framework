@@ -216,6 +216,7 @@ function openSocket() {
   socket.onerror = () => status("Connection interrupted");
 }
 const settingIds = [
+  "voice-language",
   "decision-mode",
   "decision-profile",
   "enable-start",
@@ -252,6 +253,7 @@ $("connect").onclick = async () => {
         "backchannel.enabled": $("enable-backchannel").checked,
         "start.prompt": $("prompt").value,
         "voice.prompt": $("voice-prompt").value,
+        "voice.language": $("voice-language").value,
         "compression.enabled": $("enable-compression").checked,
         "executor.enabled": $("enable-executor").checked,
         "compression.trigger_chars": Number($("compression-chars").value),

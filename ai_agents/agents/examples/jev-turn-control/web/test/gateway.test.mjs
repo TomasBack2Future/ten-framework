@@ -52,6 +52,15 @@ test("anonymous concurrent sessions have isolated events and cleanup; origin/set
       .status,
     400,
   );
+  assert.equal(
+    (await post("/api/session", { settings: { "voice.language": "fr" } }))
+      .status,
+    400,
+  );
+  const japanese = await (
+    await post("/api/session", { settings: { "voice.language": "ja" } })
+  ).json();
+  await post("/api/end", { session_id: japanese.id });
   const result = await Promise.all([
     post("/api/session"),
     post("/api/session"),

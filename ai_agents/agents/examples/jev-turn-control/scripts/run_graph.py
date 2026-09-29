@@ -19,6 +19,7 @@ def graph_for(mode, overrides):
         "provider.name",
         "provider.profile",
         "voice.prompt",
+        "voice.language",
         "executor.enabled",
         "compression.enabled",
         "compression.prompt",
@@ -41,6 +42,8 @@ def graph_for(mode, overrides):
             raise ValueError("invalid decision mode")
         if key == "provider.profile" and value not in ("baseline", "tuned"):
             raise ValueError("invalid decision profile")
+        if key == "voice.language" and value not in ("en", "ja"):
+            raise ValueError("invalid voice language")
         if key.endswith(".enabled") and not isinstance(value, bool):
             raise ValueError("boolean required")
         if key.endswith("prompt") and (
@@ -68,6 +71,7 @@ def graph_for(mode, overrides):
     # Mock transport must never call paid providers, regardless of UI selection.
     if mode == "mock":
         config["provider"]["name"] = "mock"
+    language = config.get("voice", {}).get("language", "en")
     graph = {
         "nodes": [
             {
@@ -152,9 +156,13 @@ def graph_for(mode, overrides):
                         "model_id": "${env:CARTESIA_MODEL|sonic-3}",
                         "voice": {
                             "mode": "id",
-                            "id": "${env:CARTESIA_VOICE_ID|a0e99841-438c-4a64-b679-ae501e7d6091}",
+                            "id": (
+                                "7ca2afba-a719-4f06-9af2-ea2b8e3cf14c"
+                                if language == "ja"
+                                else "${env:CARTESIA_VOICE_ID|a0e99841-438c-4a64-b679-ae501e7d6091}"
+                            ),
                         },
-                        "language": "en",
+                        "language": language,
                     },
                 },
             },
