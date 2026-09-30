@@ -1,0 +1,688 @@
+{
+  "seed": "family-split-v2",
+  "source_selection_seed": "response-eval-v2",
+  "dataset_sha256": "1562277d0dd61f4b415a13075c54ddec6ce80623e4eb5525a32f3c91064deaa1",
+  "n_sequences": 108,
+  "n_families": 108,
+  "counts": {
+    "authored_synthetic:question:holdout": 2,
+    "authored_synthetic:question:development": 4,
+    "authored_synthetic:question:validation": 2,
+    "authored_synthetic:context_short:development": 4,
+    "authored_synthetic:context_short:validation": 2,
+    "authored_synthetic:context_short:holdout": 2,
+    "authored_synthetic:numbers_finished:development": 4,
+    "authored_synthetic:numbers_finished:holdout": 2,
+    "authored_synthetic:numbers_finished:validation": 2,
+    "authored_synthetic:hesitation:validation": 2,
+    "authored_synthetic:hesitation:development": 4,
+    "authored_synthetic:hesitation:holdout": 2,
+    "authored_synthetic:explicit_wait:development": 4,
+    "authored_synthetic:explicit_wait:holdout": 2,
+    "authored_synthetic:explicit_wait:validation": 2,
+    "authored_synthetic:acknowledgment:development": 4,
+    "authored_synthetic:acknowledgment:holdout": 2,
+    "authored_synthetic:acknowledgment:validation": 2,
+    "authored_synthetic:correction:holdout": 2,
+    "authored_synthetic:correction:development": 4,
+    "authored_synthetic:correction:validation": 2,
+    "authored_synthetic:response_urge:development": 4,
+    "authored_synthetic:response_urge:holdout": 2,
+    "authored_synthetic:response_urge:validation": 2,
+    "authored_synthetic:interrupted_new_question:development": 4,
+    "authored_synthetic:interrupted_new_question:holdout": 2,
+    "authored_synthetic:interrupted_new_question:validation": 2,
+    "public_reference_projection:hesitation:holdout": 3,
+    "public_reference_projection:hesitation:validation": 3,
+    "public_reference_projection:hesitation:development": 6,
+    "public_reference_projection:interrupted_new_question:development": 6,
+    "public_reference_projection:interrupted_new_question:holdout": 3,
+    "public_reference_projection:interrupted_new_question:validation": 3,
+    "public_reference_projection:acknowledgment:validation": 3,
+    "public_reference_projection:acknowledgment:development": 6,
+    "public_reference_projection:acknowledgment:holdout": 3
+  },
+  "annotation_status": "single author; synthetic gold and source-task proxy labels; no independent blind/audio annotation",
+  "excluded_source_components": [
+    {
+      "id": "fdb-pause-1",
+      "family": "fdb-component-797185eb8ab07cb6",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-10",
+      "family": "fdb-component-ca9d065cbcd5fd21",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-100",
+      "family": "fdb-component-1f7413ea20ce5097",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-101",
+      "family": "fdb-component-9ba8b5221b1209d2",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-102",
+      "family": "fdb-component-bd92d2538ffa34cc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-103",
+      "family": "fdb-component-945ba36b41e093d6",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-104",
+      "family": "fdb-component-0f3b6d181aa6df22",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-105",
+      "family": "fdb-component-ad8b734967b9296e",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-106",
+      "family": "fdb-component-ff8682ef2d090b6f",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-107",
+      "family": "fdb-component-87d35672eecf4044",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-108",
+      "family": "fdb-component-e5106f1e443e051a",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-109",
+      "family": "fdb-component-4e3f4422601169bd",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-11",
+      "family": "fdb-component-754aec216279033e",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-110",
+      "family": "fdb-component-a689fb1ab8c660f7",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-111",
+      "family": "fdb-component-7b14af6e6c94da4c",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-112",
+      "family": "fdb-component-4528860030eec4a5",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-113",
+      "family": "fdb-component-a6525dde50a953c5",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-114",
+      "family": "fdb-component-6aafbad661511380",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-115",
+      "family": "fdb-component-8426edf0d3e22770",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-116",
+      "family": "fdb-component-033644379e4d2c0e",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-117",
+      "family": "fdb-component-9a0b37fbbd51476c",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-118",
+      "family": "fdb-component-d971e18ff75dc184",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-119",
+      "family": "fdb-component-c8fe6906135ed9f0",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-pause-12",
+      "family": "fdb-component-899edfd70418a678",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-1",
+      "family": "fdb-component-a8071ac172f0b9b4",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-26",
+      "family": "fdb-component-a8071ac172f0b9b4",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-10",
+      "family": "fdb-component-d2658b8a35f7c752",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-100",
+      "family": "fdb-component-43721e97f52bcf76",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-12",
+      "family": "fdb-component-43721e97f52bcf76",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-173",
+      "family": "fdb-component-43721e97f52bcf76",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-101",
+      "family": "fdb-component-d0b9d0fb36f7be06",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-170",
+      "family": "fdb-component-d0b9d0fb36f7be06",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-102",
+      "family": "fdb-component-1dd05c0e2e8d939b",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-103",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-106",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-110",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-124",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-125",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-143",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-161",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-168",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-171",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-18",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-191",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-21",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-4",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-57",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-66",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-7",
+      "family": "fdb-component-1c68e79334d22dfc",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-104",
+      "family": "fdb-component-a3875ca30aa59468",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-105",
+      "family": "fdb-component-49d0b1163884e04d",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-115",
+      "family": "fdb-component-49d0b1163884e04d",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-128",
+      "family": "fdb-component-49d0b1163884e04d",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-148",
+      "family": "fdb-component-49d0b1163884e04d",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-164",
+      "family": "fdb-component-49d0b1163884e04d",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-2",
+      "family": "fdb-component-49d0b1163884e04d",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-25",
+      "family": "fdb-component-49d0b1163884e04d",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-3",
+      "family": "fdb-component-49d0b1163884e04d",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-58",
+      "family": "fdb-component-49d0b1163884e04d",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-68",
+      "family": "fdb-component-49d0b1163884e04d",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-107",
+      "family": "fdb-component-32fafd68d7a298fa",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-92",
+      "family": "fdb-component-32fafd68d7a298fa",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-108",
+      "family": "fdb-component-14de2a4d5f28b2c1",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-162",
+      "family": "fdb-component-14de2a4d5f28b2c1",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-24",
+      "family": "fdb-component-14de2a4d5f28b2c1",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-75",
+      "family": "fdb-component-14de2a4d5f28b2c1",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-109",
+      "family": "fdb-component-451fed69fa9b9875",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-11",
+      "family": "fdb-component-b7562fe32bc7dd70",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-137",
+      "family": "fdb-component-b7562fe32bc7dd70",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-186",
+      "family": "fdb-component-b7562fe32bc7dd70",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-189",
+      "family": "fdb-component-b7562fe32bc7dd70",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-190",
+      "family": "fdb-component-b7562fe32bc7dd70",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-34",
+      "family": "fdb-component-b7562fe32bc7dd70",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-42",
+      "family": "fdb-component-b7562fe32bc7dd70",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-49",
+      "family": "fdb-component-b7562fe32bc7dd70",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-79",
+      "family": "fdb-component-b7562fe32bc7dd70",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-80",
+      "family": "fdb-component-b7562fe32bc7dd70",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-83",
+      "family": "fdb-component-b7562fe32bc7dd70",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-111",
+      "family": "fdb-component-9d8c637da8d306e8",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-112",
+      "family": "fdb-component-ef0addf36cd8f225",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-113",
+      "family": "fdb-component-91ad236fae61c0a6",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-114",
+      "family": "fdb-component-ab24168e0beb03a7",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-116",
+      "family": "fdb-component-56d8cf5937f00e11",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-117",
+      "family": "fdb-component-24d6dce456fa848b",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-118",
+      "family": "fdb-component-56bfd35405f0abdd",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-180",
+      "family": "fdb-component-56bfd35405f0abdd",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-91",
+      "family": "fdb-component-56bfd35405f0abdd",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-119",
+      "family": "fdb-component-a0ad50961620ab63",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-146",
+      "family": "fdb-component-a0ad50961620ab63",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-interrupt-194",
+      "family": "fdb-component-a0ad50961620ab63",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-1",
+      "family": "fdb-component-a01adf97effbb1eb",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-10",
+      "family": "fdb-component-aaff21f2cf1e3746",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-34",
+      "family": "fdb-component-aaff21f2cf1e3746",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-11",
+      "family": "fdb-component-fe944bb102b5c33a",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-47",
+      "family": "fdb-component-fe944bb102b5c33a",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-59",
+      "family": "fdb-component-fe944bb102b5c33a",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-71",
+      "family": "fdb-component-fe944bb102b5c33a",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-83",
+      "family": "fdb-component-fe944bb102b5c33a",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-95",
+      "family": "fdb-component-fe944bb102b5c33a",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-12",
+      "family": "fdb-component-31b3376985cc0d52",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-13",
+      "family": "fdb-component-f2b9debb48c09dc9",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-14",
+      "family": "fdb-component-8fa48d17a4626614",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-26",
+      "family": "fdb-component-8fa48d17a4626614",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-50",
+      "family": "fdb-component-8fa48d17a4626614",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-15",
+      "family": "fdb-component-622ebb9c0962549a",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-27",
+      "family": "fdb-component-622ebb9c0962549a",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-3",
+      "family": "fdb-component-622ebb9c0962549a",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-51",
+      "family": "fdb-component-622ebb9c0962549a",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-16",
+      "family": "fdb-component-6bbc3ae09ef4d934",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-17",
+      "family": "fdb-component-305a31e51f8a3645",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-18",
+      "family": "fdb-component-fc5d6501c44bb787",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-19",
+      "family": "fdb-component-5a4db4bfa3f7073c",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-2",
+      "family": "fdb-component-7417cbed19eefc7b",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-20",
+      "family": "fdb-component-a2376eebd7fefaf5",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-21",
+      "family": "fdb-component-4c7b0fa9f063375e",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-33",
+      "family": "fdb-component-4c7b0fa9f063375e",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-69",
+      "family": "fdb-component-4c7b0fa9f063375e",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-81",
+      "family": "fdb-component-4c7b0fa9f063375e",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-9",
+      "family": "fdb-component-4c7b0fa9f063375e",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-22",
+      "family": "fdb-component-2b31ea6648a9371d",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-23",
+      "family": "fdb-component-3663b810f8eef27c",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-24",
+      "family": "fdb-component-df69142adbe3eb4e",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-25",
+      "family": "fdb-component-00e967e72b556b7c",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-28",
+      "family": "fdb-component-d10f0731184f93f7",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-76",
+      "family": "fdb-component-d10f0731184f93f7",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-29",
+      "family": "fdb-component-9c4982e840d1949c",
+      "reason": "component touches prior seen corpus"
+    },
+    {
+      "id": "fdb-backchannel-30",
+      "family": "fdb-component-e4d63afe35f55f05",
+      "reason": "component touches prior seen corpus"
+    }
+  ],
+  "old_corpus_role": "all previously seen data and call49c0d169 are regression-only",
+  "family_grouping": "same original context, token Jaccard >= .58 or sequence similarity >= .72, transitive components; heuristic, not an independent semantic audit",
+  "files": {
+    "new-sequences.jsonl": "1562277d0dd61f4b415a13075c54ddec6ce80623e4eb5525a32f3c91064deaa1"
+  }
+}

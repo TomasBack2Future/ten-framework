@@ -1,0 +1,39 @@
+name: Jev response evaluation
+on:
+  pull_request:
+    paths:
+      - ai_agents/agents/examples/jev-turn-control/validation/response-eval-20260927/**
+      - .github/workflows/jev-response-eval.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: jev-response-eval-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  offline-evaluation:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install pinned verification tools
+        run: python -m pip install pytest==9.1.1 black==26.5.1 pylint==3.3.8
+      - name: Fetch immutable comparison sources
+        run: |
+          git fetch origin 78d44c91d2a7151da18a9d5e82b69b86dbbc1536
+          git fetch origin bf4c21e1f70940b28e4e794e7b1db08624afaedb
+      - name: Restore evidence and verify offline
+        working-directory: ai_agents/agents/examples/jev-turn-control/validation/response-eval-20260927
+        run: |
+          python src/prepare.py --repo "$GITHUB_WORKSPACE"
+          python -m black --check --line-length 80 src
+          python -m pylint --rcfile="$GITHUB_WORKSPACE/tools/pylint/.pylintrc" src/*.py
+          python -m pytest -q src/test_evaluation.py
+          python src/analyze.py report
+          python src/sequence_metrics.py
+          python src/measurement_summary.py
+          python src/seen_regression.py
+          python src/offline_verify.py

@@ -1,0 +1,7 @@
+__pycache__/
+.pytest_cache/
+reference/
+reference-fixed/
+data/snapshots.jsonl
+results/*network.jsonl
+results/*metrics.json
